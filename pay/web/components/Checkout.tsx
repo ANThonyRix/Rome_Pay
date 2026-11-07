@@ -8,7 +8,7 @@ import type { Hex } from "viem";
 import type { LaneSigner } from "@/vendor/rome-sdk";
 import { CHAIN, FUNDING_LINKS, addressUrl, txUrl } from "@/lib/chain";
 import { fmt, short } from "@/lib/format";
-import { fromDTO, type InvoiceDTO } from "@/lib/invoices";
+import { fromDTO, parseUsdc, type Invoice, type LinkDTO } from "@/lib/invoices";
 import {
   LANE_STEPS,
   ensureEvmChain,
@@ -50,8 +50,18 @@ const INSTALL = {
   solana: { name: "Solflare", href: "https://www.solflare.com/download/" },
 } as const;
 
-export default function Checkout({ invoice: dto }: { invoice: InvoiceDTO }) {
-  const invoice = useMemo(() => fromDTO(dto), [dto]);
+export default function Checkout({ link: dto }: { link: LinkDTO }) {
+  const link = useMemo(() => fromDTO(dto), [dto]);
+  // Open-amount links: the payer types the amount; 0n means "not entered yet".
+  const openAmount = link.amount === null;
+  const [typed, setTyped] = useState("");
+  const typedAmount = openAmount ? parseUsdc(typed) : null;
+  const invoice = useMemo<Invoice>(
+    () => ({ ...link, amount: link.amount ?? typedAmount ?? 0n }),
+    [link, typedAmount],
+  );
+  const amountReady = invoice.amount > 0n;
+  const amountInvalid = openAmount && typed.trim() !== "" && typedAmount === null;
   const amount = fmt(invoice.amount, 6);
 
   const [evmWallets, setEvmWallets] = useState<EvmWallet[]>([]);
@@ -126,8 +136,10 @@ export default function Checkout({ invoice: dto }: { invoice: InvoiceDTO }) {
     [],
   );
 
+  const plannedFor = useRef<bigint | null>(null);
   const inspect = useCallback(
     async (c: Conn) => {
+      plannedFor.current = invoice.amount;
       setBusy("plan");
       setError(null);
       try {
@@ -142,7 +154,7 @@ export default function Checkout({ invoice: dto }: { invoice: InvoiceDTO }) {
   );
 
   const connect = async () => {
-    if (!lane) return;
+    if (!lane || !amountReady) return;
     setBusy("connect");
     setError(null);
     try {
@@ -205,14 +217,50 @@ export default function Checkout({ invoice: dto }: { invoice: InvoiceDTO }) {
     if (paid) actionRef.current?.focus();
   }, [paid]);
 
+  // Tell the server about the payment so the merchant sees it at once. The server reads the
+  // receipt from Rome itself; a daily reconcile catches anything this misses.
+  const payHash = results.pay?.hash;
+  useEffect(() => {
+    if (!paid || !payHash) return;
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; attempt < 4 && !cancelled; attempt++) {
+        try {
+          const res = await fetch("/api/payments", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ txHash: payHash }),
+          });
+          if (res.status !== 202 && res.status !== 502) return;
+        } catch {
+          // Offline or blocked: retry below.
+        }
+        await new Promise((resolve) => setTimeout(resolve, 3000 * (attempt + 1)));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [paid, payHash]);
+
   // Balances are read once per inspection; a shortfall blocks the route until the payer adds funds and checks again.
   const anyDone = steps.some((id) => states[id] === "done");
+  // Open amount edited after connecting: read the balances again for the new amount.
+  useEffect(() => {
+    if (!openAmount || !conn || !plan || anyDone || running || !amountReady) return;
+    if (plannedFor.current === invoice.amount) return;
+    const timer = setTimeout(() => inspect(conn), 500);
+    return () => clearTimeout(timer);
+  }, [openAmount, conn, plan, anyDone, running, amountReady, invoice.amount, inspect]);
+
   const fundsShort = plan?.shortfall && !paid && !anyDone ? plan.shortfall : null;
 
   // ------------------------------ the one big button ------------------------------
   let action: { label: string; onClick?: () => void; href?: string; disabled?: boolean; pending?: boolean };
   if (!lane) {
     action = { label: "Choose a wallet line above", disabled: true };
+  } else if (!amountReady && !paid) {
+    action = { label: "Enter the amount above", disabled: true };
   } else if (!conn) {
     const installed = lane === "evm" ? evmWallet : solWallet;
     action = installed
@@ -263,10 +311,37 @@ export default function Checkout({ invoice: dto }: { invoice: InvoiceDTO }) {
               {invoice.memo}
             </p>
           </div>
-          <p className={s.amount}>
-            <span className={s.amountValue}>{amount}</span>
-            <span className={s.amountUnit}>USDC</span>
-          </p>
+          {openAmount ? (
+            <div className={s.amountField}>
+              <label className={s.amount}>
+                <span className="visually-hidden">Amount in USDC</span>
+                <input
+                  className={s.amountInput}
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="0.00"
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  readOnly={running || anyDone}
+                  aria-invalid={amountInvalid || undefined}
+                  aria-describedby="amount-hint"
+                />
+                <span className={s.amountUnit}>USDC</span>
+              </label>
+              <p id="amount-hint" className={amountInvalid ? s.amountError : s.amountHint}>
+                {amountInvalid
+                  ? "Enter an amount above 0 and up to 1,000,000, with at most 6 decimals."
+                  : anyDone
+                    ? "Amount locked: a station on this route is already cleared."
+                    : "You choose the amount."}
+              </p>
+            </div>
+          ) : (
+            <p className={s.amount}>
+              <span className={s.amountValue}>{amount}</span>
+              <span className={s.amountUnit}>USDC</span>
+            </p>
+          )}
           <dl className={s.plateMeta}>
             <div>
               <dt>Paid to</dt>

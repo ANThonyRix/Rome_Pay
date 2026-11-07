@@ -9,9 +9,13 @@ export default function Home() {
         USDC payment links on Rome. Customers pay from MetaMask or Solflare; the merchant gets the same on-chain receipt
         either way.
       </p>
-      <Link className={s.cta} href="/pay/demo">
-        Open the demo checkout
+      <Link className={s.cta} href="/dashboard">
+        Create a payment link
       </Link>
+      <nav className={s.more} aria-label="More">
+        <Link href="/pay/demo">Try the demo checkout</Link>
+        <Link href="/earnings">How Rome Pay earns</Link>
+      </nav>
     </main>
   );
 }

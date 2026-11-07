@@ -1,0 +1,84 @@
+/* Shared shell for the merchant dashboard and the public earnings page. */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3) var(--s5);
+  padding: var(--s5) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.nav {
+  display: flex;
+  gap: var(--s1);
+}
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--s3);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-muted);
+  border-bottom: 3px solid transparent;
+  transition: color 120ms var(--ease-out), border-color 120ms var(--ease-out);
+}
+.nav a:hover {
+  color: var(--text);
+}
+.nav a[aria-current="page"] {
+  color: var(--text);
+  border-bottom-color: var(--porcelain);
+}
+.end {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+.network {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s1) var(--s3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.network em {
+  font-style: normal;
+  color: var(--enamel);
+  background: var(--amber);
+  padding: 0 var(--s2);
+  border-radius: 2px;
+}
+@media (max-width: 639px) {
+  .nav {
+    order: 3;
+    width: 100%;
+    margin: 0 calc(var(--s3) * -1);
+  }
+  .end {
+    margin-left: auto;
+  }
+}

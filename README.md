@@ -23,6 +23,18 @@ Rome runs EVM transactions on Solana, so both wallets reach the same contract:
 
 One-time steps are skipped when the wallet has already done them.
 
+## Merchant dashboard and payment records
+
+- `/dashboard`: the merchant signs in with their wallet (Sign-In with Ethereum, a free message
+  signature). There they create links (fixed or open amount, single-use or reusable), copy or close
+  them, set a display name and see every payment with its fee.
+- `/earnings`: a public page with the fee rate read from the contract, an example split,
+  payment volume and the latest payments. Fee totals and the treasury are deliberately not shown.
+- Links, sessions and payments live in Postgres (Neon). A payment is recorded three ways, each
+  idempotent: the checkout reports its transaction hash to `/api/payments` (the server reads the
+  receipt), pages pick up new `Paid` events with `eth_getLogs` when opened, and a daily Vercel cron
+  (`/api/cron/reconcile`) catches anything left over.
+
 ## Fees
 
 The protocol fee is set in the contract (`feeBps`, capped at 1% by `MAX_FEE_BPS`). It is taken out of
@@ -56,7 +68,22 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000/pay/demo. To pay on testnet you need:
+Open http://localhost:3000/pay/demo. The demo link works without a database. For the dashboard,
+link the project to Vercel and pull its environment, then create the tables once:
+
+```bash
+npx vercel link
+npx vercel env pull .env.local
+npm run db:migrate
+```
+
+| Variable | Where it comes from | Used for |
+|---|---|---|
+| `DATABASE_URL` | Neon integration in Vercel | links, sessions, payments |
+| `CRON_SECRET` | set by hand in Vercel, any long random string | authorizes the daily reconcile cron |
+| `NEXT_PUBLIC_SOLANA_RPC` | optional | Solana Devnet RPC for the Solflare lane |
+
+To pay on testnet you need:
 
 - **MetaMask**: test USDC on Rome Hadrian. Get Sepolia or Solana Devnet USDC from the
   [Circle faucet](https://faucet.circle.com/), then bridge it with the
@@ -87,12 +114,12 @@ Contracts are compiled for the `paris` EVM version, because Rome does not docume
 ## Deploy to Vercel
 
 Import this repository in Vercel and set **Root Directory** to `pay/web`. The framework preset is
-detected as Next.js. Every push to `main` triggers a new deployment.
+detected as Next.js. Every push to `main` triggers a new deployment. Add the Neon integration
+(it sets `DATABASE_URL`) and `CRON_SECRET`, then run `npm run db:migrate` once. `vercel.json`
+schedules the reconcile cron daily at 04:00 UTC (the Hobby plan allows one run per day).
 
 ## Roadmap
 
-- Merchant dashboard with wallet sign-in: create links, operation history
-- Open-amount links for tips and donations
-- Payment verification and signed webhooks for merchants
-- Public earnings page: fees collected and treasury balance
+- Signed webhooks (HMAC) for merchants
+- Dashboard sign-in with Solflare
 - Mainnet (Rome Rubicon) deployment

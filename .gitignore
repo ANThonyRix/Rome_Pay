@@ -25,5 +25,6 @@ ignition/deployments/chain-31337/
 /ideas.md
 /pay/web/AGENTS.md
 /pay/web/README.md
+/pay/web/.impeccable/
 *.log
 .DS_Store

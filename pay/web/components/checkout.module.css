@@ -470,3 +470,50 @@
   min-height: 280px;
   align-content: center;
 }
+
+/* Open amount: the payer types the figure on the plate */
+.amountField {
+  display: grid;
+  gap: var(--s2);
+}
+.amountInput {
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 var(--s1);
+  border: 0;
+  border-bottom: 2px dashed var(--ink-muted);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: clamp(4.5rem, 16vw, 9rem);
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+}
+.amountInput::placeholder {
+  color: var(--ink-muted);
+  opacity: 0.45;
+}
+.amountInput:focus {
+  outline: none;
+  border-bottom-style: solid;
+  border-bottom-color: var(--ink);
+}
+.amountInput:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 4px;
+}
+.amountInput[readonly] {
+  border-bottom-color: transparent;
+}
+.amountInput[aria-invalid] {
+  border-bottom-color: var(--scarlet);
+}
+.amountHint,
+.amountError {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+}
+.amountError {
+  color: #a3172a; /* scarlet darkened for porcelain: 6.6:1 */
+}
