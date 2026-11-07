@@ -15,5 +15,15 @@ ignition/deployments/chain-31337/
 .claude/settings.local.json
 # Third-party agent skills (installed locally, see skills-lock.json)
 .claude/skills/
+
+# Local working notes (kept on disk, not published)
+/CLAUDE.md
+/DESIGN.md
+/Memory.md
+/PRODUCT.md
+/building.md
+/ideas.md
+/pay/web/AGENTS.md
+/pay/web/README.md
 *.log
 .DS_Store
