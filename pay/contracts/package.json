@@ -1,0 +1,22 @@
+{
+  "name": "@rome-pay/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "hardhat build",
+    "test": "hardhat test",
+    "deploy:hadrian": "hardhat run scripts/deploy.ts --network hadrian",
+    "deploy:rubicon": "hardhat run scripts/deploy.ts --network rubicon",
+    "smoke:hadrian": "hardhat run scripts/smoke-pay.ts --network hadrian",
+    "fee:hadrian": "hardhat run scripts/set-fee.ts --network hadrian"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.7",
+    "@openzeppelin/contracts": "^5.6.1",
+    "@types/node": "^22.0.0",
+    "hardhat": "^3.21.2",
+    "typescript": "~5.9.3",
+    "viem": "^2.57.16"
+  }
+}

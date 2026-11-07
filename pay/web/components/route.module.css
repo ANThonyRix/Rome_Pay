@@ -1,0 +1,268 @@
+/* Route map: one coloured line with fixed station plates.
+   Marks: hollow = to do, filled porcelain = done, muted = done earlier,
+   amber = in progress, scarlet strike = failed. */
+
+.route {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.station {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: var(--s4);
+}
+
+.track {
+  position: relative;
+  min-height: 28px;
+}
+
+/* Segment from this station to the next one. Line colour always; hollow until the
+   station is cleared, like a line under construction on a transit map. */
+.track::after {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 14px;
+  bottom: 0;
+  width: 6px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--line);
+  transform-origin: top center;
+}
+.station[data-cleared] .track::after {
+  background: var(--line);
+}
+
+/* The other wallet's line entering the interchange at 45 degrees. */
+.stub {
+  position: absolute;
+  left: 11px;
+  top: -22px;
+  width: 6px;
+  height: 36px;
+  background: var(--green);
+  opacity: 0.75;
+  transform-origin: 50% 100%;
+  transform: rotate(-45deg);
+}
+.route[data-lane="solana"] .stub {
+  background: var(--cobalt);
+}
+.station[data-kind="terminus"] .track::after {
+  content: none;
+}
+
+.mark {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--enamel);
+  border: 5px solid var(--line);
+}
+
+.station[data-state="done"] .mark {
+  background: var(--porcelain);
+}
+.station[data-state="skip"] .mark {
+  background: var(--text-muted);
+  border-color: var(--text-muted);
+}
+.station[data-state="busy"] .mark {
+  background: var(--amber);
+  border-color: var(--amber);
+}
+.station[data-state="failed"] .mark {
+  border-color: var(--scarlet);
+}
+.station[data-state="failed"] .mark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 4px;
+  height: 30px;
+  margin-left: -2px;
+  background: var(--scarlet);
+  transform: rotate(45deg);
+}
+
+/* Interchange: PayRouter, the ring where both lines meet. */
+.station[data-kind="interchange"] .mark {
+  top: -6px;
+  left: -6px;
+  width: 40px;
+  height: 40px;
+  border: 7px solid var(--porcelain);
+  background: var(--enamel);
+}
+.station[data-kind="interchange"][data-state="done"] .mark {
+  background: var(--line);
+}
+.station[data-kind="interchange"][data-state="busy"] .mark {
+  background: var(--amber);
+}
+.station[data-kind="interchange"][data-state="failed"] .mark {
+  border-color: var(--scarlet);
+}
+
+/* Terminus: the merchant, a bar across the line. */
+.station[data-kind="terminus"] .mark {
+  top: -8px;
+  left: 8px;
+  width: 12px;
+  height: 44px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--porcelain);
+}
+.station[data-kind="terminus"][data-state="done"] .mark {
+  background: var(--line);
+  box-shadow: 0 0 0 3px var(--porcelain);
+}
+
+.plate {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--s5);
+  min-width: 0;
+}
+.station:last-child .plate {
+  padding-bottom: 0;
+}
+
+.name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.375rem;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.does {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  max-width: 34ch;
+}
+.cost {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.state {
+  margin-top: var(--s1);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.station[data-state="done"] .state {
+  color: var(--line-text);
+}
+.station[data-state="busy"] .state {
+  color: var(--amber);
+}
+.station[data-state="failed"] .state {
+  color: var(--scarlet-text);
+}
+
+/* Arrival: the line fills into the terminus, then the bar takes the line colour. */
+.route[data-arrived] .station[data-kind="interchange"] .track::after {
+  animation: sweep 900ms var(--ease-out) both;
+}
+.route[data-arrived] .station[data-kind="terminus"] .mark {
+  animation: dock 300ms var(--ease-out) 700ms both;
+}
+@keyframes sweep {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes dock {
+  from {
+    background: var(--porcelain);
+    box-shadow: 0 0 0 0 var(--porcelain);
+  }
+}
+
+/* Wide screens: the line runs left to right. */
+@media (min-width: 860px) {
+  .route {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    grid-auto-flow: column;
+  }
+  .station {
+    grid-template-columns: 1fr;
+    row-gap: var(--s4);
+    align-content: start;
+  }
+  .track::after {
+    left: 14px;
+    right: 0;
+    top: 11px;
+    bottom: auto;
+    width: auto;
+    height: 6px;
+    transform-origin: left center;
+  }
+  .plate {
+    padding-right: var(--s5);
+    padding-bottom: 0;
+  }
+  /* MetaMask route: Solflare joins from below-left, as on the schematic. */
+  .stub {
+    top: -32px;
+    height: 46px;
+  }
+  .route[data-lane="evm"] .stub {
+    top: 14px;
+    transform-origin: 50% 0;
+    transform: rotate(45deg);
+  }
+  @keyframes sweep {
+    from {
+      transform: scaleX(0);
+    }
+  }
+}
+
+/* Schematic shown before a line is chosen. */
+.schematic {
+  margin: 0;
+}
+.schematic svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.schematic svg[data-size="wide"] {
+  display: none;
+}
+@media (min-width: 720px) {
+  .schematic svg[data-size="wide"] {
+    display: block;
+  }
+  .schematic svg[data-size="narrow"] {
+    display: none;
+  }
+}
+.schematicText {
+  fill: var(--text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

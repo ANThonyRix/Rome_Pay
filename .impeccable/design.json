@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T00:00:00Z",
+  "title": "Design System: Rome Pay",
+  "extensions": {
+    "colorMeta": {
+      "enamel": { "role": "neutral", "displayName": "Midnight Enamel", "canonical": "#0f1d3a", "tonalRamp": ["#050a16", "#0a1530", "#0f1d3a", "#142650", "#22386a", "#3a5288", "#6f84b0", "#c9d2e6"] },
+      "enamel-deep": { "role": "neutral", "displayName": "Deep Enamel", "canonical": "#0a1530", "tonalRamp": ["#03060f", "#060d1f", "#0a1530", "#111f44", "#1d2f5c", "#344a7c", "#6a7ea8", "#c6cfe3"] },
+      "enamel-raised": { "role": "neutral", "displayName": "Raised Enamel", "canonical": "#142650", "tonalRamp": ["#070e1f", "#0d1a38", "#142650", "#1c3266", "#2b447f", "#46609a", "#7d91bd", "#d0d8ea"] },
+      "porcelain": { "role": "neutral", "displayName": "Station Porcelain", "canonical": "#f5f6f2", "tonalRamp": ["#262724", "#45463f", "#67685f", "#8b8c83", "#b0b1a8", "#d3d4cd", "#e8e9e4", "#f5f6f2"] },
+      "ink": { "role": "neutral", "displayName": "Plate Ink", "canonical": "#0f1d3a", "tonalRamp": ["#050a16", "#0a1530", "#0f1d3a", "#142650", "#22386a", "#3a5288", "#6f84b0", "#c9d2e6"] },
+      "ink-muted": { "role": "neutral", "displayName": "Plate Ink Muted", "canonical": "#46506a", "tonalRamp": ["#151821", "#242a39", "#343c50", "#46506a", "#5d6884", "#7d879f", "#a4acbf", "#d5d9e2"] },
+      "text": { "role": "neutral", "displayName": "Porcelain Text", "canonical": "#f5f6f2", "tonalRamp": ["#262724", "#45463f", "#67685f", "#8b8c83", "#b0b1a8", "#d3d4cd", "#e8e9e4", "#f5f6f2"] },
+      "text-muted": { "role": "neutral", "displayName": "Signage Grey", "canonical": "#a9b3c7", "tonalRamp": ["#1f2430", "#363e4f", "#4f5970", "#6a7591", "#8893ab", "#a9b3c7", "#c9d0dc", "#e9ecf2"] },
+      "rule": { "role": "neutral", "displayName": "Hairline", "canonical": "rgba(245, 246, 242, 0.22)" },
+      "rule-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "rgba(245, 246, 242, 0.5)" },
+      "cobalt": { "role": "primary", "displayName": "MetaMask Cobalt", "canonical": "#2a62e0", "tonalRamp": ["#0a1840", "#11286b", "#1a3d9e", "#2a62e0", "#5582ea", "#8fb0ff", "#bdd0ff", "#e6edff"] },
+      "cobalt-text": { "role": "primary", "displayName": "Cobalt Signal Text", "canonical": "#8fb0ff", "tonalRamp": ["#0a1840", "#11286b", "#1a3d9e", "#2a62e0", "#5582ea", "#8fb0ff", "#bdd0ff", "#e6edff"] },
+      "green": { "role": "primary", "displayName": "Solflare Green", "canonical": "#1f9d61", "tonalRamp": ["#06291a", "#0c452c", "#146a42", "#1f9d61", "#36bd7f", "#5fd39a", "#9ce6c0", "#ddf7ea"] },
+      "green-text": { "role": "primary", "displayName": "Green Signal Text", "canonical": "#5fd39a", "tonalRamp": ["#06291a", "#0c452c", "#146a42", "#1f9d61", "#36bd7f", "#5fd39a", "#9ce6c0", "#ddf7ea"] },
+      "amber": { "role": "tertiary", "displayName": "Pending Amber", "canonical": "#f2a900", "tonalRamp": ["#3a2800", "#5e4100", "#8a6000", "#bb8300", "#f2a900", "#ffc443", "#ffdb8c", "#fff3d6"] },
+      "scarlet": { "role": "tertiary", "displayName": "Failure Scarlet", "canonical": "#d7263d", "tonalRamp": ["#3d0911", "#64101d", "#9a192c", "#d7263d", "#ea5566", "#ff8e99", "#ffbcc3", "#ffe8ea"] },
+      "scarlet-text": { "role": "tertiary", "displayName": "Scarlet Signal Text", "canonical": "#ff8e99", "tonalRamp": ["#3d0911", "#64101d", "#9a192c", "#d7263d", "#ea5566", "#ff8e99", "#ffbcc3", "#ffe8ea"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The payment amount on the destination plate only." },
+      "headline": { "displayName": "Headline", "purpose": "Merchant name, the page h1, uppercase and balanced." },
+      "title": { "displayName": "Title", "purpose": "Station names and line badge titles, uppercase." },
+      "button": { "displayName": "Button", "purpose": "Next-station button and wordmark, uppercase." },
+      "label": { "displayName": "Label", "purpose": "Definition terms, station state words, section titles, tags; uppercase, tracked 0.06 to 0.08em." },
+      "body": { "displayName": "Body", "purpose": "Sentences; tabular numerals on globally." },
+      "body-small": { "displayName": "Body Small", "purpose": "Station descriptions (max 34ch), badge detail, footer (max 68ch)." },
+      "data": { "displayName": "Data", "purpose": "Addresses, hashes, references, amounts and fee percentages only." }
+    },
+    "shadows": [
+      { "name": "track-hollow", "value": "inset 0 0 0 2px var(--line)", "purpose": "Stroke geometry, not elevation: draws an unfinished (hollow) track segment in the line colour." },
+      { "name": "terminus-docked", "value": "0 0 0 3px var(--porcelain)", "purpose": "Stroke geometry, not elevation: porcelain ring around the terminus bar once the payment arrives." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "All transitions and the arrival sequence." },
+      { "name": "interaction", "value": "120ms to 160ms", "purpose": "Badge border/fill, button brightness, arrow nudge, 1px press." },
+      { "name": "arrival-sweep", "value": "900ms ease-out", "purpose": "The one motion moment: the line scales in along its axis into the terminus when payment confirms." },
+      { "name": "terminus-dock", "value": "300ms ease-out, 700ms delay", "purpose": "Terminus bar takes the line colour after the sweep." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "prefers-reduced-motion collapses all animations and transitions; scroll-to-route becomes instant." }
+    ],
+    "breakpoints": [
+      { "name": "schematic-wide", "value": "720px" },
+      { "name": "route-horizontal", "value": "860px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Next-Station Button (MetaMask line)",
+      "kind": "button",
+      "refersTo": "button-next-station-evm",
+      "description": "The one primary action: full-width slab naming the next station, in the lane colour.",
+      "html": "<button class=\"ds-go\" type=\"button\">Approve 0.10 wUSDC <svg class=\"ds-go-arrow\" viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path d=\"M3 10h13M11 5l5 5-5 5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\"/></svg></button>",
+      "css": ".ds-go { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 24px; border: 0; border-radius: 4px; background: var(--cobalt, #2a62e0); color: var(--porcelain, #f5f6f2); font-family: var(--font-display, 'Barlow Condensed', 'Arial Narrow', sans-serif); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; transition: filter 160ms cubic-bezier(0.22,1,0.36,1), transform 120ms cubic-bezier(0.22,1,0.36,1); } .ds-go-arrow { transition: transform 160ms cubic-bezier(0.22,1,0.36,1); } .ds-go:hover { filter: brightness(1.1); } .ds-go:hover .ds-go-arrow { transform: translateX(3px); } .ds-go:active { transform: translateY(1px); } .ds-go:focus-visible { outline: 2px solid var(--amber, #f2a900); outline-offset: 3px; }"
+    },
+    {
+      "name": "Next-Station Button (Solflare line)",
+      "kind": "button",
+      "refersTo": "button-next-station-solana",
+      "description": "Same slab on the green line; text is midnight enamel, never white.",
+      "html": "<button class=\"ds-go-sol\" type=\"button\">Pay 0.10 USDC <svg viewBox=\"0 0 20 20\" width=\"20\" height=\"20\" aria-hidden=\"true\"><path d=\"M3 10h13M11 5l5 5-5 5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"square\"/></svg></button>",
+      "css": ".ds-go-sol { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 24px; border: 0; border-radius: 4px; background: var(--green, #1f9d61); color: var(--enamel, #0f1d3a); font-family: var(--font-display, 'Barlow Condensed', 'Arial Narrow', sans-serif); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; transition: filter 160ms cubic-bezier(0.22,1,0.36,1); } .ds-go-sol:hover { filter: brightness(1.1); } .ds-go-sol:active { transform: translateY(1px); } .ds-go-sol:focus-visible { outline: 2px solid var(--amber, #f2a900); outline-offset: 3px; }"
+    },
+    {
+      "name": "Next-Station Button (busy)",
+      "kind": "button",
+      "refersTo": "button-next-station-busy",
+      "description": "While waiting for the wallet or the chain: amber, spinner, no arrow.",
+      "html": "<button class=\"ds-go-busy\" type=\"button\" disabled aria-busy=\"true\"><span class=\"ds-spinner\" aria-hidden=\"true\"></span>Confirm in MetaMask</button>",
+      "css": ".ds-go-busy { display: inline-flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 24px; border: 0; border-radius: 4px; background: var(--amber, #f2a900); color: var(--enamel, #0f1d3a); font-family: var(--font-display, 'Barlow Condensed', 'Arial Narrow', sans-serif); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: default; } .ds-spinner { width: 18px; height: 18px; border: 3px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ds-spin 800ms linear infinite; } @keyframes ds-spin { to { transform: rotate(360deg); } }"
+    },
+    {
+      "name": "Line Badge",
+      "kind": "chip",
+      "refersTo": "line-badge",
+      "description": "Radio for choosing a wallet line; bullet ring and border take the lane colour.",
+      "html": "<button class=\"ds-badge\" type=\"button\" role=\"radio\" aria-checked=\"true\"><span class=\"ds-badge-bullet\" aria-hidden=\"true\"></span><span class=\"ds-badge-text\"><span class=\"ds-badge-title\">MetaMask line</span><span class=\"ds-badge-detail\">EVM wallet. Pays with USDC on Rome.</span></span><span class=\"ds-badge-status\">Detected</span></button>",
+      "css": ".ds-badge { --badge: var(--cobalt, #2a62e0); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; width: 100%; min-height: 72px; padding: 12px 16px; text-align: left; background: transparent; color: var(--text, #f5f6f2); border: 1px solid var(--rule-strong, rgba(245,246,242,0.5)); border-radius: 4px; cursor: pointer; font-family: var(--font-text, Barlow, system-ui, sans-serif); transition: border-color 160ms cubic-bezier(0.22,1,0.36,1), background-color 160ms cubic-bezier(0.22,1,0.36,1); } .ds-badge:hover { border-color: var(--badge); background: var(--enamel-raised, #142650); } .ds-badge[aria-checked='true'] { border: 2px solid var(--badge); background: var(--enamel-raised, #142650); padding: 11px 15px; } .ds-badge:focus-visible { outline: 2px solid var(--amber, #f2a900); outline-offset: 3px; } .ds-badge-bullet { width: 40px; height: 40px; border-radius: 50%; border: 6px solid var(--badge); background: var(--porcelain, #f5f6f2); } .ds-badge-text { display: grid; gap: 2px; min-width: 0; } .ds-badge-title { font-family: var(--font-display, 'Barlow Condensed', 'Arial Narrow', sans-serif); font-weight: 600; font-size: 1.375rem; line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; } .ds-badge-detail, .ds-badge-status { color: var(--text-muted, #a9b3c7); font-size: 0.9375rem; } .ds-badge-status { font-size: 0.875rem; white-space: nowrap; }"
+    },
+    {
+      "name": "Destination Plate",
+      "kind": "card",
+      "refersTo": "destination-plate",
+      "description": "The one porcelain surface: merchant, memo, display amount, meta grid with mono values.",
+      "html": "<section class=\"ds-plate\"><h1 class=\"ds-plate-merchant\">Ostia Type Foundry</h1><p class=\"ds-plate-memo\"><span class=\"ds-demo-tag\">Demo invoice</span>Font licence, Desktop, 1 seat</p><p class=\"ds-plate-amount\"><span class=\"ds-plate-value\">0.10</span><span class=\"ds-plate-unit\">USDC</span></p><dl class=\"ds-plate-meta\"><div><dt>Paid to</dt><dd>0xf35f…5c2a</dd></div><div><dt>Reference</dt><dd>0x8f44…e8e3</dd></div><div><dt>Fee</dt><dd>0%</dd></div></dl></section>",
+      "css": ".ds-plate { background: var(--porcelain, #f5f6f2); color: var(--ink, #0f1d3a); border-radius: 4px; padding: 24px; display: grid; gap: 16px; } .ds-plate-merchant { margin: 0; font-family: var(--font-display, 'Barlow Condensed', 'Arial Narrow', sans-serif); font-weight: 700; font-size: clamp(1.75rem, 4.5vw, 2.75rem); line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; } .ds-plate-memo { margin: 0; color: var(--ink-muted, #46506a); font-size: 1.0625rem; } .ds-demo-tag { display: inline-block; margin-right: 8px; padding: 0 8px; border: 1px solid var(--ink, #0f1d3a); border-radius: 2px; color: var(--ink, #0f1d3a); font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; font-size: 0.875rem; letter-spacing: 0.08em; text-transform: uppercase; } .ds-plate-amount { margin: 0; display: flex; align-items: baseline; gap: 12px; font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; line-height: 0.85; } .ds-plate-value { font-size: clamp(4.5rem, 16vw, 9rem); letter-spacing: -0.01em; } .ds-plate-unit { font-size: clamp(1.5rem, 4vw, 2.25rem); letter-spacing: 0.04em; } .ds-plate-meta { margin: 0; padding-top: 16px; border-top: 2px solid var(--ink, #0f1d3a); display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px 24px; } .ds-plate-meta dt { font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; font-size: 0.875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted, #46506a); } .ds-plate-meta dd { margin: 0; font-family: var(--font-mono, 'IBM Plex Mono', ui-monospace, monospace); font-size: 0.9375rem; }"
+    },
+    {
+      "name": "Network Tag",
+      "kind": "chip",
+      "refersTo": "network-tag",
+      "description": "Header network signage with an amber testnet flag.",
+      "html": "<span class=\"ds-network\">Rome Hadrian <em>Testnet</em></span>",
+      "css": ".ds-network { display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; border: 1px solid var(--rule-strong, rgba(245,246,242,0.5)); border-radius: 4px; color: var(--text, #f5f6f2); font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; } .ds-network em { font-style: normal; color: var(--enamel, #0f1d3a); background: var(--amber, #f2a900); padding: 0 8px; border-radius: 2px; }"
+    },
+    {
+      "name": "Route Station",
+      "kind": "custom",
+      "refersTo": "route-station",
+      "description": "Signature component: station mark on a line-coloured track plus a fixed name plate. Mark states: hollow todo, porcelain done, muted skip, amber busy, scarlet strike failed.",
+      "html": "<ol class=\"ds-route\"><li class=\"ds-station\" data-state=\"done\" data-cleared><span class=\"ds-track\"><span class=\"ds-mark\"></span></span><span class=\"ds-plate2\"><span class=\"ds-name\">Grant</span><span class=\"ds-does\">Lets the wUSDC wrapper move your tokens</span><span class=\"ds-state\">Done</span></span></li><li class=\"ds-station\" data-state=\"busy\"><span class=\"ds-track\"><span class=\"ds-mark\"></span></span><span class=\"ds-plate2\"><span class=\"ds-name\">Approve</span><span class=\"ds-does\">Lets PayRouter take exactly 0.10 wUSDC</span><span class=\"ds-state\">In progress</span></span></li><li class=\"ds-station\" data-state=\"todo\"><span class=\"ds-track\"><span class=\"ds-mark\"></span></span><span class=\"ds-plate2\"><span class=\"ds-name\">PayRouter</span><span class=\"ds-does\">Pays 0.10 USDC to the merchant in one transaction</span><span class=\"ds-state\">To do</span></span></li></ol>",
+      "css": ".ds-route { --line: var(--cobalt, #2a62e0); --line-text: var(--cobalt-text, #8fb0ff); list-style: none; margin: 0; padding: 0; display: grid; color: var(--text, #f5f6f2); } .ds-station { position: relative; display: grid; grid-template-columns: 28px 1fr; column-gap: 16px; } .ds-track { position: relative; min-height: 28px; } .ds-station:not(:last-child) .ds-track::after { content: ''; position: absolute; left: 11px; top: 14px; bottom: 0; width: 6px; box-shadow: inset 0 0 0 2px var(--line); } .ds-station[data-cleared] .ds-track::after { background: var(--line); } .ds-mark { position: absolute; z-index: 1; top: 0; left: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--enamel, #0f1d3a); border: 5px solid var(--line); box-sizing: border-box; } .ds-station[data-state='done'] .ds-mark { background: var(--porcelain, #f5f6f2); } .ds-station[data-state='busy'] .ds-mark { background: var(--amber, #f2a900); border-color: var(--amber, #f2a900); } .ds-plate2 { display: flex; flex-direction: column; gap: 2px; padding-bottom: 24px; } .ds-name { font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; font-size: 1.375rem; line-height: 1.1; letter-spacing: 0.02em; text-transform: uppercase; } .ds-does { color: var(--text-muted, #a9b3c7); font-size: 0.9375rem; line-height: 1.4; max-width: 34ch; } .ds-state { margin-top: 4px; font-family: var(--font-display, 'Barlow Condensed', sans-serif); font-weight: 600; font-size: 0.9375rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted, #a9b3c7); } .ds-station[data-state='done'] .ds-state { color: var(--line-text); } .ds-station[data-state='busy'] .ds-state { color: var(--amber, #f2a900); }"
+    },
+    {
+      "name": "Error Notice",
+      "kind": "custom",
+      "refersTo": "notice-error",
+      "description": "Outlined scarlet box with a struck-circle icon; no filled alert background.",
+      "html": "<p class=\"ds-error\" role=\"alert\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M3 13 13 3\" stroke=\"currentColor\" stroke-width=\"2\"/></svg>You rejected the request in MetaMask.</p>",
+      "css": ".ds-error { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 12px 16px; border: 1px solid var(--scarlet, #d7263d); border-radius: 4px; color: var(--text, #f5f6f2); } .ds-error svg { flex: none; margin-top: 4px; color: var(--scarlet-text, #ff8e99); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Interchange",
+    "overview": "A payment is a ride on a transit map. The payer's wallet is a line; its setup steps are stations; the PayRouter contract is the interchange where the MetaMask and Solflare lines meet; the merchant is the terminus. Everything is drawn as flat signage on a midnight enamel wall: condensed capitals, round station marks, coloured line segments, a porcelain destination plate. Nothing glows, floats, or blurs.\n\nThe surface is dense with real information (amounts, fees, signature counts, hashes) but ordered like a platform sign: the destination plate first, then the line choice, then the route, then one large button that clears the next station. The colour of a line means the wallet; amber means something is happening now; scarlet means something failed. Those meanings never move.",
+    "keyCharacteristics": [
+      "Midnight enamel wall with a single porcelain plate as the only light surface.",
+      "One lane colour at a time, set by `data-lane`, painting the route, the selected badge, and the primary button.",
+      "Station marks carry all step state; the name plates beside them never change wording.",
+      "Condensed transit capitals for every heading, label and button; mono only for data.",
+      "Flat: depth comes from tone (enamel-deep, enamel, enamel-raised, porcelain), never from shadow."
+    ],
+    "rules": [
+      { "name": "The Lane Owns the Colour Rule", "body": "Exactly one lane colour is live on a screen, set by `[data-lane]` on the page (`--line`, `--line-ink`, `--line-text`). Cobalt and green appear together only where both lines are drawn: the schematic and the other-wallet stub at the interchange.", "section": "colors" },
+      { "name": "The Signal Reservation Rule", "body": "Amber means \"in progress or needs attention\", scarlet means \"failed\". Neither is decoration, and neither is used for a lane.", "section": "colors" },
+      { "name": "The Ink on Green Rule", "body": "Text on a green fill is midnight enamel; text on cobalt is porcelain. Never white on green.", "section": "colors" },
+      { "name": "The Signage Caps Rule", "body": "Every heading, label, state word and button is Barlow Condensed in uppercase with positive tracking. Body sentences are never uppercase.", "section": "typography" },
+      { "name": "The Readout Rule", "body": "Mono is for addresses, hashes, amounts and counts only. Readout amounts carry the unit \"USDC\".", "section": "typography" },
+      { "name": "The No Glow Rule", "body": "Light comes from porcelain and line colour, never from shadow, gradient or blur.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do set lane colour through `[data-lane]` and the `--line`, `--line-ink`, `--line-text` variables, never by hard-coding cobalt or green in a component.",
+      "Do put midnight enamel text on green and amber fills, porcelain text on cobalt.",
+      "Do express step state only through the station mark grammar (hollow, porcelain, muted, amber, scarlet strike) plus the state word.",
+      "Do keep one full-width next-station button per view, sticky on phones under 860px.",
+      "Do keep every target at least 44px and keep the amber 2px focus ring (ink inside the porcelain plate).",
+      "Do keep the arrival sweep the only expressive animation, and honour `prefers-reduced-motion`.",
+      "Do write UI copy in English, with exact amounts and the unit \"USDC\" or \"wUSDC\"."
+    ],
+    "donts": [
+      "Don't add drop shadows, glows, gradients or blur; depth is tonal.",
+      "Don't use amber or scarlet for anything but pending and failed (amber also marks focus and testnet).",
+      "Don't show both lane colours as competing accents outside the schematic and the interchange stub.",
+      "Don't set sentences, prose states or labels in mono.",
+      "Don't round corners beyond 4px or use pill buttons; circles belong to station marks.",
+      "Don't bend lines at angles other than 45 and 90 degrees."
+    ]
+  }
+}
