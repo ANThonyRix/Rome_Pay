@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CHAIN } from "@/lib/chain";
 import s from "./site.module.css";
 
-type Section = "dashboard" | null;
+type Section = "dashboard" | "faq" | null;
 
 export default function SiteHeader({ current = null, children }: { current?: Section; children?: React.ReactNode }) {
   return (
@@ -17,6 +17,9 @@ export default function SiteHeader({ current = null, children }: { current?: Sec
       <nav className={s.nav} aria-label="Main">
         <Link href="/dashboard" aria-current={current === "dashboard" ? "page" : undefined}>
           Dashboard
+        </Link>
+        <Link href="/faq" aria-current={current === "faq" ? "page" : undefined}>
+          FAQ
         </Link>
       </nav>
       <div className={s.end}>

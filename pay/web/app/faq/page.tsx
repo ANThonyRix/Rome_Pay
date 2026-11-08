@@ -297,7 +297,7 @@ const GROUPS: Group[] = [
 export default function FaqPage() {
   return (
     <div className={d.page}>
-      <SiteHeader />
+      <SiteHeader current="faq" />
       <main className={f.main}>
         <h1 className={f.title}>Questions and answers</h1>
         <p className={f.lead}>How Rome Pay works, in plain words.</p>
