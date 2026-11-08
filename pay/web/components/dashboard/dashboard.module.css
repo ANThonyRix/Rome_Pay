@@ -1,4 +1,4 @@
-/* Merchant dashboard and earnings page: Operate mode inside the Interchange world.
+/* Merchant dashboard: Operate mode inside the Interchange world.
    Flat enamel, porcelain only for the one primary action, condensed caps for labels, mono for data. */
 
 .page {
@@ -477,45 +477,6 @@ a.mono:hover {
     gap: var(--s3);
     margin-left: calc(var(--s2) * -1);
   }
-}
-
-/* ------------------------------ earnings: split + facts ------------------------------ */
-.split {
-  display: flex;
-  gap: 3px;
-  height: 14px;
-  margin-bottom: var(--s4);
-}
-.split span:first-child {
-  background: var(--porcelain);
-  border-radius: var(--radius) 0 0 var(--radius);
-}
-.split span:last-child {
-  min-width: 6px;
-  background: var(--amber);
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
-.facts {
-  margin: 0 0 var(--s3);
-  display: grid;
-}
-.facts > div {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--s4);
-  padding: var(--s2) 0;
-  border-bottom: 1px solid var(--rule);
-}
-.facts dt {
-  color: var(--text-muted);
-}
-.facts dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  text-align: right;
-}
-.facts > div:last-child dd {
-  color: var(--text);
 }
 
 /* ------------------------------ sign-in ------------------------------ */

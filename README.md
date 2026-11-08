@@ -28,8 +28,6 @@ One-time steps are skipped when the wallet has already done them.
 - `/dashboard`: the merchant signs in with their wallet (Sign-In with Ethereum, a free message
   signature). There they create links (fixed or open amount, single-use or reusable), copy or close
   them, set a display name and see every payment with its fee.
-- `/earnings`: a public page with the fee rate read from the contract, an example split,
-  payment volume and the latest payments. Fee totals and the treasury are deliberately not shown.
 - Links, sessions and payments live in Postgres (Neon). A payment is recorded three ways, each
   idempotent: the checkout reports its transaction hash to `/api/payments` (the server reads the
   receipt), pages pick up new `Paid` events with `eth_getLogs` when opened, and a daily Vercel cron

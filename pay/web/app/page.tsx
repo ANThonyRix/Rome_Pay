@@ -14,7 +14,6 @@ export default function Home() {
       </Link>
       <nav className={s.more} aria-label="More">
         <Link href="/pay/demo">Try the demo checkout</Link>
-        <Link href="/earnings">How Rome Pay earns</Link>
       </nav>
     </main>
   );
