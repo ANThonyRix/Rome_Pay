@@ -187,6 +187,9 @@ function readSignedV1(walletName: string, wire: Uint8Array, signed: Uint8Array, 
       if (feeOnly && sigOk) return { message: walletMessage, signature };
       notes.push(`${feeOnly ? "fee-only" : explainFeeMismatch(message, walletMessage)}, signature over it ${sigOk ? "valid" : "invalid"}`);
     }
+    // Full bytes for an offline diff; neither holds a secret (the message is public once sent).
+    const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+    console.error("[rome-pay] wallet-signed v1 rejected", { composed: b64(message), signed: b64(signed) });
     throw new Error(`${(err as Error).message} Detail: ${notes.join(" | ") || "no v1 layout found"}.`);
   }
 }

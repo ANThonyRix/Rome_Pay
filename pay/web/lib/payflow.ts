@@ -336,5 +336,5 @@ export function explainError(err: unknown, walletName: string): string {
   }
   if (/insufficient/i.test(msg)) return "Your balance is too low for this step. Add funds and try again.";
   if (/timeout|timed out|fetch failed|network/i.test(msg)) return "The network did not answer in time. Your funds are safe. Try the step again.";
-  return `${walletName} or the network stopped this step: ${(e?.shortMessage ?? e?.message ?? String(err)).slice(0, 280)}`;
+  return `${walletName} or the network stopped this step: ${(e?.shortMessage ?? e?.message ?? String(err)).slice(0, 700)}`;
 }
