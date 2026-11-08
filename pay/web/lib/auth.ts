@@ -10,8 +10,9 @@ import { db } from "./db";
 import { getMerchant, upsertMerchant, type Merchant } from "./store";
 
 // Sign-In with Ethereum (EIP-4361) via viem/siwe for MetaMask, and the same message shape for Solana
-// wallets (Sign-In with Solana text format, checked with ed25519). The nonce lives in a short-lived
-// httpOnly cookie, the session is a random token whose sha256 is stored in Postgres. No signing secret is needed.
+// wallets (Sign-In with Solana text format, checked with ed25519). The nonce is stored in Postgres and
+// consumed once, and it is also bound to the browser by a short-lived httpOnly cookie. The session is a
+// random token whose sha256 is stored in Postgres. No signing secret is needed.
 
 const NONCE_COOKIE = "rp_nonce";
 const SESSION_COOKIE = "rp_session";
@@ -23,8 +24,19 @@ const cookieBase = { httpOnly: true, secure: true, path: "/" } as const;
 
 export async function issueNonce(): Promise<string> {
   const nonce = generateSiweNonce();
+  const sql = db();
+  await sql.transaction([
+    sql`delete from auth_nonces where expires_at < now()`,
+    sql`insert into auth_nonces (nonce, expires_at) values (${nonce}, now() + make_interval(secs => ${NONCE_TTL_S}))`,
+  ]);
   (await cookies()).set(NONCE_COOKIE, nonce, { ...cookieBase, sameSite: "strict", maxAge: NONCE_TTL_S });
   return nonce;
+}
+
+/** Uses the nonce up. True only for the first caller, so a signed message cannot be replayed. */
+async function consumeNonce(nonce: string): Promise<void> {
+  const rows = await db()`delete from auth_nonces where nonce = ${nonce} and expires_at > now() returning nonce`;
+  if (!rows.length) throw new SignInError("The sign-in request expired. Try again.");
 }
 
 export class SignInError extends Error {}
@@ -45,6 +57,7 @@ export async function signIn(message: string, signature: Hex, host: string): Pro
   const valid = await verifyMessage({ address, message, signature }).catch(() => false);
   if (!valid) throw new SignInError("The signature does not match the address.");
 
+  await consumeNonce(nonce);
   await upsertMerchant(address);
   await openSession(address);
   return address;
@@ -84,6 +97,7 @@ export async function signInSolana(message: string, signatureB58: string, host: 
   const valid = pubkey.length === 32 && signature.length === 64 && ed25519.verify(signature, new TextEncoder().encode(message), pubkey);
   if (!valid) throw new SignInError("The signature does not match the wallet.");
 
+  await consumeNonce(nonce);
   const address = getAddress(`0x${keccak256(pubkey).slice(-40)}`);
   await upsertMerchant(address, pubkeyText);
   await openSession(address);

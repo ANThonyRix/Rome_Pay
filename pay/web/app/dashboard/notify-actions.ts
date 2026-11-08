@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { currentMerchant } from "@/lib/auth";
+import { rateLimit } from "@/lib/ratelimit";
 import {
   WebhookUrlError,
   checkWebhookUrl,
@@ -50,6 +51,7 @@ export async function rotateSecretAction(): Promise<NotifyState> {
 export async function sendTestAction(_prev: NotifyState, form: FormData): Promise<NotifyState> {
   const merchant = await currentMerchant();
   if (!merchant) return SIGNED_OUT;
+  if (!(await rateLimit(`send-test:${merchant.address}`, 10, 60))) return { error: "Too many test events. Wait a minute." };
   const channel = form.get("channel") === "telegram" ? "telegram" : "webhook";
   const result = await sendTest(merchant.address, channel);
   if (result.ok) return { ok: channel === "webhook" ? `Test event delivered (HTTP ${result.status}).` : "Test message sent. Check Telegram." };

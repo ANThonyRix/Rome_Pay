@@ -102,3 +102,18 @@ where p.tx_hash = r.tx_hash and p.log_index = r.log_index and p.log_index <> r.o
   and not exists (select 1 from sync_state where key = 'migration:payments-ordinal');
 
 insert into sync_state (key, block) values ('migration:payments-ordinal', 0) on conflict (key) do nothing;
+
+-- Added 2026-11-08: single-use sign-in nonces and a fixed-window rate limiter.
+create table if not exists auth_nonces (
+  nonce       text primary key,
+  expires_at  timestamptz not null
+);
+create index if not exists auth_nonces_expires_idx on auth_nonces (expires_at);
+
+create table if not exists rate_limits (
+  key           text not null,
+  window_start  timestamptz not null,
+  hits          integer not null default 0,
+  primary key (key, window_start)
+);
+create index if not exists rate_limits_window_idx on rate_limits (window_start);

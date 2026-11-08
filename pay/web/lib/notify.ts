@@ -1,11 +1,14 @@
 import "server-only";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { lookup as dnsLookup } from "node:dns";
+import http from "node:http";
+import https from "node:https";
+import { isIP, type LookupFunction } from "node:net";
 import { getAddress, type Hex } from "viem";
 import { CHAIN, txUrl } from "./chain";
 import { db } from "./db";
 import { fmt, short } from "./format";
+import { isPrivateIp } from "./net-guard";
 
 // Payment notifications: signed webhooks and Telegram messages, fed by the `notifications` outbox.
 // Rows are queued when a payment is first stored (store.ts) and delivered by deliverDue(), which
@@ -117,20 +120,6 @@ export function signatureHeader(secret: string, body: string, t = Math.floor(Dat
 /** Only allowed outside production, so a developer can point a webhook at localhost. */
 const allowPrivate = () => process.env.NODE_ENV !== "production" && process.env.WEBHOOK_ALLOW_PRIVATE === "1";
 
-function isPrivateIp(ip: string): boolean {
-  if (isIP(ip) === 6) {
-    const v = ip.toLowerCase();
-    if (v === "::" || v === "::1") return true;
-    if (v.startsWith("::ffff:")) return isPrivateIp(v.slice(7));
-    return /^(fc|fd|fe8|fe9|fea|feb)/.test(v);
-  }
-  const [a, b] = ip.split(".").map(Number);
-  return (
-    a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224
-  );
-}
-
 export class WebhookUrlError extends Error {}
 
 /** Normalizes a merchant's webhook URL, or throws a message the merchant can act on. */
@@ -154,13 +143,21 @@ export function checkWebhookUrl(input: string): string {
   return url.href;
 }
 
-/** Resolves the host right before sending, so a public name that points inside a network is refused. */
-async function assertPublicHost(url: URL): Promise<void> {
-  if (allowPrivate()) return;
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
-  if (!addresses.length || addresses.some((a) => isPrivateIp(a.address))) throw new Error("host resolves to a private address");
-}
+/**
+ * DNS lookup used by the webhook connection itself. The address that passes the check is the address
+ * the socket connects to, so a name cannot answer "public" to a check and "internal" to the connect.
+ */
+const publicOnlyLookup: LookupFunction = (hostname, options, callback) => {
+  dnsLookup(hostname, { ...options, all: true }, (error, addresses) => {
+    if (error) return callback(error, "", 0);
+    const list = Array.isArray(addresses) ? addresses : [];
+    if (!allowPrivate() && (!list.length || list.some((a) => isPrivateIp(a.address)))) {
+      return callback(new Error("host resolves to a private address"), "", 0);
+    }
+    if (options.all) return callback(null, list);
+    return callback(null, list[0].address, list[0].family);
+  });
+};
 
 interface SendResult {
   ok: boolean;
@@ -168,26 +165,47 @@ interface SendResult {
   error: string | null;
 }
 
+/** One POST with a total time limit. Redirects are never followed. Resolves with the status code. */
+function sendRequest(url: URL, headers: Record<string, string>, body: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const client = url.protocol === "http:" ? http : https;
+    const req = client.request(
+      url,
+      { method: "POST", headers: { ...headers, "content-length": String(Buffer.byteLength(body)) }, lookup: publicOnlyLookup },
+      (res) => {
+        clearTimeout(timer);
+        res.destroy();
+        resolve(res.statusCode ?? 0);
+      },
+    );
+    const timer = setTimeout(() => req.destroy(Object.assign(new Error("timeout"), { name: "TimeoutError" })), SEND_TIMEOUT_MS);
+    req.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    req.end(body);
+  });
+}
+
 async function postWebhook(urlText: string, secret: string, event: PaymentEvent): Promise<SendResult> {
   const body = JSON.stringify(event);
   try {
     const url = new URL(urlText);
-    await assertPublicHost(url);
-    const res = await fetch(url, {
-      method: "POST",
-      redirect: "manual",
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
-      headers: {
+    const host = url.hostname.replace(/^\[|\]$/g, "");
+    // An IP literal skips DNS, so the lookup hook never sees it: check it here.
+    if (!allowPrivate() && isIP(host) && isPrivateIp(host)) throw new Error("host resolves to a private address");
+    const status = await sendRequest(
+      url,
+      {
         "content-type": "application/json",
         "user-agent": "RomePay-Webhooks/1.0",
         "rome-pay-event-id": event.id,
         "rome-pay-signature": signatureHeader(secret, body),
       },
       body,
-    });
-    await res.body?.cancel().catch(() => undefined);
-    const ok = res.status >= 200 && res.status < 300;
-    return { ok, status: res.status, error: ok ? null : `HTTP ${res.status}` };
+    );
+    const ok = status >= 200 && status < 300;
+    return { ok, status, error: ok ? null : `HTTP ${status}` };
   } catch (error) {
     const reason = error instanceof Error ? (error.name === "TimeoutError" ? `no answer in ${SEND_TIMEOUT_MS / 1000} s` : error.message) : String(error);
     return { ok: false, status: null, error: reason.slice(0, 200) };

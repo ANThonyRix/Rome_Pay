@@ -2,12 +2,15 @@ import { after } from "next/server";
 import { isHash } from "viem";
 import { dbConfigured } from "@/lib/db";
 import { deliverDue } from "@/lib/notify";
+import { clientIp, rateLimit, tooMany } from "@/lib/ratelimit";
 import { verifyPaymentTx } from "@/lib/store";
 
 // The checkout reports a pay transaction here. Nothing from the client is trusted:
 // the server reads the receipt from Rome and stores the router's Paid events it contains.
 export async function POST(request: Request) {
   if (!dbConfigured()) return Response.json({ status: "unconfigured" }, { status: 503 });
+  // Each call can cost an RPC read; 30 a minute per address is far above any real checkout.
+  if (!(await rateLimit(`payments:${clientIp(request.headers)}`, 30, 60))) return tooMany();
   const body = (await request.json().catch(() => null)) as { txHash?: unknown } | null;
   const txHash = body?.txHash;
   if (typeof txHash !== "string" || !isHash(txHash)) {

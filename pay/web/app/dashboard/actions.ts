@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { currentMerchant, signOut } from "@/lib/auth";
 import { parseUsdc } from "@/lib/invoices";
+import { rateLimit } from "@/lib/ratelimit";
 import { createLink, deleteUnpaidLink, setLinkArchived, setMerchantName } from "@/lib/store";
 
 export type FormState = { error?: string; ok?: string; linkId?: string };
@@ -13,6 +14,7 @@ const NAME_MAX = 60;
 export async function createLinkAction(_prev: FormState, form: FormData): Promise<FormState> {
   const merchant = await currentMerchant();
   if (!merchant) return { error: "Your session ended. Sign in again." };
+  if (!(await rateLimit(`create-link:${merchant.address}`, 30, 3600))) return { error: "Too many links in the last hour. Try again later." };
 
   const open = form.get("mode") === "open";
   const memo = String(form.get("memo") ?? "").trim();

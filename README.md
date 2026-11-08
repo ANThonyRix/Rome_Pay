@@ -110,6 +110,17 @@ function verifyRomePay(rawBody, header, secret, toleranceSec = 300) {
 }
 ```
 
+## Security notes
+
+- Sign-in nonces are stored in Postgres and used once, and also bound to the browser by an httpOnly cookie,
+  so a signed message cannot be replayed.
+- Public endpoints (`/api/payments`, sign-in) and expensive dashboard actions are rate limited with
+  fixed-window counters in Postgres (`rate_limits`). The cron deletes old windows and expired nonces.
+- Webhook delivery connects only to public addresses: the address checked is the address connected to
+  (pinned DNS lookup), IPv6 is allow-listed to global unicast, and redirects are not followed.
+- Responses carry `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `nosniff`, a strict referrer policy and
+  a restrictive permissions policy. The cron secret is compared in constant time.
+
 ## Fees
 
 The protocol fee is set in the contract (`feeBps`, capped at 1% by `MAX_FEE_BPS`). It is taken out of
