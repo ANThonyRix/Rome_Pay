@@ -6,7 +6,7 @@
 import { getWallets } from "@wallet-standard/app";
 import { PublicKey } from "@solana/web3.js";
 import { ed25519 } from "@noble/curves/ed25519";
-import { splitV1Wire, type LaneSigner } from "@/vendor/rome-sdk";
+import { parseV1Message, splitV1Wire, type LaneSigner, type ParsedV1Message } from "@/vendor/rome-sdk";
 import type { Eip1193 } from "./payflow";
 
 // ------------------------------ EVM (EIP-6963) ------------------------------
@@ -163,6 +163,57 @@ export function laneSigner(wallet: SolanaWallet, account: SolanaAccount, cluster
 }
 
 const SIG = 64;
+const V1_VERSION = 0x81;
+
+const hex = (bytes: Uint8Array) => Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+
+/**
+ * Name what a wallet changed in a v1 message, so a failed signature can be diagnosed from
+ * one screenshot. Tries the two wire layouts wallets return (signature last, or count +
+ * signature first) and diffs the decoded message against the one we composed.
+ */
+function describeRewrite(composed: Uint8Array, signed: Uint8Array): string {
+  const candidates: Uint8Array[] = [];
+  if (signed[0] === V1_VERSION && signed.length > SIG) candidates.push(signed.subarray(0, signed.length - SIG));
+  if (signed[1 + SIG] === V1_VERSION) candidates.push(signed.subarray(1 + SIG));
+  const base = `returned ${signed.length} bytes (version byte 0x${(signed[0] ?? 0).toString(16)}), composed ${composed.length + SIG}`;
+
+  let before: ParsedV1Message;
+  try {
+    before = parseV1Message(composed);
+  } catch {
+    return base;
+  }
+  for (const candidate of candidates) {
+    let after: ParsedV1Message;
+    try {
+      after = parseV1Message(candidate);
+    } catch {
+      continue;
+    }
+    const diff: string[] = [];
+    if (hex(composed.subarray(8, 40)) !== hex(candidate.subarray(8, 40))) diff.push("recent blockhash replaced");
+    if (before.priorityFeeMicroLamports !== after.priorityFeeMicroLamports) {
+      diff.push(`priority fee ${before.priorityFeeMicroLamports ?? "none"} -> ${after.priorityFeeMicroLamports ?? "none"}`);
+    }
+    if (before.computeUnitLimit !== after.computeUnitLimit) {
+      diff.push(`compute limit ${before.computeUnitLimit ?? "none"} -> ${after.computeUnitLimit ?? "none"}`);
+    }
+    if (before.heapBytes !== after.heapBytes) diff.push(`heap ${before.heapBytes ?? "none"} -> ${after.heapBytes ?? "none"}`);
+    if (before.instructions.length !== after.instructions.length) {
+      diff.push(`instructions ${before.instructions.length} -> ${after.instructions.length}`);
+    }
+    if (before.accountKeys.length !== after.accountKeys.length) {
+      diff.push(`accounts ${before.accountKeys.length} -> ${after.accountKeys.length}`);
+    }
+    const sameIx =
+      before.instructions.length === after.instructions.length &&
+      before.instructions.every((ix, i) => hex(ix.data) === hex(after.instructions[i]!.data));
+    if (!sameIx && before.instructions.length === after.instructions.length) diff.push("instruction data changed");
+    return `${diff.length ? diff.join(", ") : "no field-level difference found"}; ${base}`;
+  }
+  return `${signed[0] === V1_VERSION ? "unreadable v1 message" : "not returned as a v1 transaction"}; ${base}`;
+}
 
 const indexOf = (hay: Uint8Array, needle: Uint8Array) => {
   outer: for (let i = 0; i + needle.length <= hay.length; i++) {
@@ -199,8 +250,10 @@ function pickV1Signature(walletName: string, wire: Uint8Array, signed: Uint8Arra
     messageFoundAt: msgAt,
   });
   if (msgAt < 0) {
+    const changes = describeRewrite(message, signed);
+    console.debug("[rome-pay] wallet rewrite", { wallet: walletName, changes });
     throw new Error(
-      `${walletName} changed the transaction before signing it (added or rewrote instructions), so Rome cannot accept it. Turn off any transaction "protection" or priority-fee option in ${walletName} and try again.`,
+      `${walletName} changed the transaction before signing it, so Rome cannot accept it. What changed: ${changes}. Turn off any transaction "protection" or priority-fee option in ${walletName} and try again.`,
     );
   }
   throw new Error(`${walletName} returned a signature that does not match this transaction.`);
