@@ -417,6 +417,16 @@ a.mono:hover {
 .muted {
   color: var(--text-muted);
 }
+.revealBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3) var(--s4);
+  margin-top: var(--s4);
+}
+.revealBar .textButton {
+  margin-left: auto;
+}
 .empty {
   padding: var(--s5) 0;
   border-top: 2px solid var(--porcelain);

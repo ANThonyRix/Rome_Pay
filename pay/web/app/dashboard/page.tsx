@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import CopyLink from "@/components/dashboard/CopyLink";
 import NameForm from "@/components/dashboard/NameForm";
 import NewLinkForm from "@/components/dashboard/NewLinkForm";
+import Reveal from "@/components/dashboard/Reveal";
 import SignIn from "@/components/dashboard/SignIn";
 import d from "@/components/dashboard/dashboard.module.css";
 import SiteHeader from "@/components/SiteHeader";
@@ -148,8 +149,10 @@ const STATUS: Record<LinkSummary["status"], string> = { open: "Open", paid: "Pai
 
 function LinksTable({ links }: { links: LinkSummary[] }) {
   return (
-    <table className={d.table}>
-      <thead>
+    <Reveal
+      noun="links"
+      step={5}
+      head={
         <tr>
           <th scope="col">For</th>
           <th scope="col" className={d.num}>Amount</th>
@@ -158,49 +161,49 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
           <th scope="col" className={d.num}>Received</th>
           <th scope="col"><span className="visually-hidden">Actions</span></th>
         </tr>
-      </thead>
-      <tbody>
-        {links.map((link) => (
-          <tr key={link.id} data-status={link.status}>
-            <td data-label="For">
-              <span className={d.memo}>{link.memo}</span>
-              <code className={d.code}>/pay/{link.id}</code>
-              {link.reusable && link.amount !== null ? <span className={d.tag}>Reusable</span> : null}
-            </td>
-            <td data-label="Amount" className={d.num}>
-              {link.amount === null ? "Payer enters" : `${usdc(link.amount)} USDC`}
-            </td>
-            <td data-label="Status">
-              <span className={d.status} data-status={link.status}>{STATUS[link.status]}</span>
-            </td>
-            <td data-label="Paid" className={d.num}>{link.paidCount}</td>
-            <td data-label="Received" className={d.num}>{usdc(link.received)}</td>
-            <td className={d.actions}>
-              {link.status !== "archived" ? <CopyLink id={link.id} label="Copy" /> : null}
-              {link.status !== "archived" ? (
-                <Link className={d.textButton} href={`/pay/${link.id}`} target="_blank">
-                  Open
-                </Link>
-              ) : null}
-              <form action={setArchivedAction}>
-                <input type="hidden" name="id" value={link.id} />
-                <input type="hidden" name="archived" value={link.status === "archived" ? "0" : "1"} />
-                <button className={d.textButton} type="submit">
-                  {link.status === "archived" ? "Reopen" : "Close"}
-                </button>
-              </form>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      }
+      rows={links.map((link) => (
+        <tr key={link.id} data-status={link.status}>
+          <td data-label="For">
+            <span className={d.memo}>{link.memo}</span>
+            <code className={d.code}>/pay/{link.id}</code>
+            {link.reusable && link.amount !== null ? <span className={d.tag}>Reusable</span> : null}
+          </td>
+          <td data-label="Amount" className={d.num}>
+            {link.amount === null ? "Payer enters" : `${usdc(link.amount)} USDC`}
+          </td>
+          <td data-label="Status">
+            <span className={d.status} data-status={link.status}>{STATUS[link.status]}</span>
+          </td>
+          <td data-label="Paid" className={d.num}>{link.paidCount}</td>
+          <td data-label="Received" className={d.num}>{usdc(link.received)}</td>
+          <td className={d.actions}>
+            {link.status !== "archived" ? <CopyLink id={link.id} label="Copy" /> : null}
+            {link.status !== "archived" ? (
+              <Link className={d.textButton} href={`/pay/${link.id}`} target="_blank">
+                Open
+              </Link>
+            ) : null}
+            <form action={setArchivedAction}>
+              <input type="hidden" name="id" value={link.id} />
+              <input type="hidden" name="archived" value={link.status === "archived" ? "0" : "1"} />
+              <button className={d.textButton} type="submit">
+                {link.status === "archived" ? "Reopen" : "Close"}
+              </button>
+            </form>
+          </td>
+        </tr>
+      ))}
+    />
   );
 }
 
 function HistoryTable({ payments }: { payments: Payment[] }) {
   return (
-    <table className={d.table}>
-      <thead>
+    <Reveal
+      noun="payments"
+      step={10}
+      head={
         <tr>
           <th scope="col">Date, UTC</th>
           <th scope="col">For</th>
@@ -210,28 +213,26 @@ function HistoryTable({ payments }: { payments: Payment[] }) {
           <th scope="col" className={d.num}>You got</th>
           <th scope="col">Receipt</th>
         </tr>
-      </thead>
-      <tbody>
-        {payments.map((p) => (
-          <tr key={`${p.txHash}:${p.logIndex}`}>
-            <td data-label="Date">{p.blockTime ? when.format(p.blockTime) : "Pending"}</td>
-            <td data-label="For">{p.memo ?? <span className={d.muted}>Not from a link</span>}</td>
-            <td data-label="Payer">
-              <a className={d.mono} href={addressUrl(p.payer)} target="_blank" rel="noreferrer">
-                {short(p.payer)}
-              </a>
-            </td>
-            <td data-label="Amount" className={d.num}>{usdc(p.amount)}</td>
-            <td data-label="Fee" className={d.num}>{usdc(p.fee)}</td>
-            <td data-label="You got" className={d.num}>{usdc(p.amount - p.fee)}</td>
-            <td data-label="Receipt">
-              <a className={d.mono} href={txUrl(p.txHash)} target="_blank" rel="noreferrer">
-                {short(p.txHash, 8, 4)}
-              </a>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      }
+      rows={payments.map((p) => (
+        <tr key={`${p.txHash}:${p.logIndex}`}>
+          <td data-label="Date">{p.blockTime ? when.format(p.blockTime) : "Pending"}</td>
+          <td data-label="For">{p.memo ?? <span className={d.muted}>Not from a link</span>}</td>
+          <td data-label="Payer">
+            <a className={d.mono} href={addressUrl(p.payer)} target="_blank" rel="noreferrer">
+              {short(p.payer)}
+            </a>
+          </td>
+          <td data-label="Amount" className={d.num}>{usdc(p.amount)}</td>
+          <td data-label="Fee" className={d.num}>{usdc(p.fee)}</td>
+          <td data-label="You got" className={d.num}>{usdc(p.amount - p.fee)}</td>
+          <td data-label="Receipt">
+            <a className={d.mono} href={txUrl(p.txHash)} target="_blank" rel="noreferrer">
+              {short(p.txHash, 8, 4)}
+            </a>
+          </td>
+        </tr>
+      ))}
+    />
   );
 }
