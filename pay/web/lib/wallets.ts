@@ -180,13 +180,35 @@ function readSignedV1(walletName: string, wire: Uint8Array, signed: Uint8Array, 
     const layouts: [Uint8Array, Uint8Array][] = [];
     if (signed[0] === V1_VERSION && signed.length > SIG) layouts.push([signed.slice(0, -SIG), signed.slice(-SIG)]);
     if (signed[0] === 1 && signed[1 + SIG] === V1_VERSION) layouts.push([signed.slice(1 + SIG), signed.slice(1, 1 + SIG)]);
+    const notes: string[] = [];
     for (const [walletMessage, signature] of layouts) {
-      if (walletAddedPriorityFee(message, walletMessage) !== null && ed25519.verify(signature, walletMessage, payer)) {
-        return { message: walletMessage, signature };
-      }
+      const feeOnly = walletAddedPriorityFee(message, walletMessage) !== null;
+      const sigOk = ed25519.verify(signature, walletMessage, payer);
+      if (feeOnly && sigOk) return { message: walletMessage, signature };
+      notes.push(`${feeOnly ? "fee-only" : explainFeeMismatch(message, walletMessage)}, signature over it ${sigOk ? "valid" : "invalid"}`);
     }
-    throw err;
+    throw new Error(`${(err as Error).message} Detail: ${notes.join(" | ") || "no v1 layout found"}.`);
   }
+}
+
+/** Where the wallet's message stops matching "ours plus an inserted priority fee". */
+function explainFeeMismatch(composed: Uint8Array, signed: Uint8Array): string {
+  const u32 = (b: Uint8Array) => (b.length >= 8 ? new DataView(b.buffer, b.byteOffset, b.byteLength).getUint32(4, true) : -1);
+  const head = `mask 0x${u32(composed).toString(16)} -> 0x${u32(signed).toString(16)}, sizes ${composed.length}/${signed.length}`;
+  if (composed.length < 42 || signed.length !== composed.length + 8) return head;
+  const at = 42 + 32 * composed[41]!;
+  const region = (i: number) => (i < 4 ? "header" : i < 40 ? "blockhash" : i < 42 ? "counts" : i < at ? `account ${Math.floor((i - 42) / 32)}` : "after fee");
+  for (let i = 0; i < at; i++) {
+    if ((i < 4 || i >= 8) && signed[i] !== composed[i]) {
+      return `${head}, first diff at byte ${i} (${region(i)}): 0x${composed[i]!.toString(16)} -> 0x${signed[i]!.toString(16)}`;
+    }
+  }
+  for (let i = at; i < composed.length; i++) {
+    if (signed[i + 8] !== composed[i]) {
+      return `${head}, first diff at byte ${i} (${region(i)}, ${i - at} after keys): 0x${composed[i]!.toString(16)} -> 0x${signed[i + 8]!.toString(16)}`;
+    }
+  }
+  return `${head}, bytes match`;
 }
 
 const SIG = 64;
