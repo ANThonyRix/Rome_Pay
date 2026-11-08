@@ -6,8 +6,8 @@ export default function Home() {
     <main className={s.home}>
       <h1 className={s.title}>Rome Pay</h1>
       <p className={s.lead}>
-        USDC payment links on Rome. Customers pay from MetaMask or Solflare; the merchant gets the same on-chain receipt
-        either way.
+        Create a payment link to get paid in USDC for goods and services, or to receive donations. Payers use MetaMask
+        or Solflare.
       </p>
       <Link className={s.cta} href="/dashboard">
         Create a payment link
