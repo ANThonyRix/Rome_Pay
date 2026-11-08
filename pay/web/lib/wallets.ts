@@ -200,7 +200,7 @@ function pickV1Signature(walletName: string, wire: Uint8Array, signed: Uint8Arra
   });
   if (msgAt < 0) {
     throw new Error(
-      `${walletName} changed the transaction before signing it (added or rewrote instructions), so Rome would reject it. Turn off any transaction "protection" or priority-fee option in ${walletName} and try again.`,
+      `${walletName} changed the transaction before signing it (added or rewrote instructions), so Rome cannot accept it. Turn off any transaction "protection" or priority-fee option in ${walletName} and try again.`,
     );
   }
   throw new Error(`${walletName} returned a signature that does not match this transaction.`);

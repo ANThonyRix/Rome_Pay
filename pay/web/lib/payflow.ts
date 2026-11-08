@@ -313,10 +313,21 @@ export async function estimateStep(step: StepId, plan: Plan, invoice: Invoice): 
 }
 
 /** Map wallet and node errors to a sentence a payer can act on. */
+/**
+ * Only the wallet's own "the user said no" answer counts as a decline. A loose /reject/ match
+ * also caught wallet and chain failures ("... Rome would reject it") and hid the real reason.
+ */
+export function isUserRejection(err: unknown): boolean {
+  const e = err as { code?: number; name?: string; message?: string; shortMessage?: string };
+  if (e?.code === 4001 || e?.name === "UserRejectedRequestError") return true;
+  const msg = `${e?.shortMessage ?? ""} ${e?.message ?? ""}`;
+  return /user (rejected|denied|declined|cancell?ed|closed)|rejected the request|request (was )?(rejected|cancell?ed)|cancell?ed by (the )?user/i.test(msg);
+}
+
 export function explainError(err: unknown, walletName: string): string {
   const e = err as { code?: number; message?: string; shortMessage?: string; reason?: string };
   const msg = `${e?.shortMessage ?? ""} ${e?.message ?? ""}`;
-  if (e?.code === 4001 || /reject|denied|declined|cancel/i.test(msg)) {
+  if (isUserRejection(err)) {
     return `You declined in ${walletName}. Nothing was sent. Continue when you are ready.`;
   }
   if (err instanceof StepFailed) return `This step did not go through: ${err.reason}. No payment was made. Try the step again.`;
@@ -325,5 +336,5 @@ export function explainError(err: unknown, walletName: string): string {
   }
   if (/insufficient/i.test(msg)) return "Your balance is too low for this step. Add funds and try again.";
   if (/timeout|timed out|fetch failed|network/i.test(msg)) return "The network did not answer in time. Your funds are safe. Try the step again.";
-  return `Something went wrong: ${(e?.shortMessage ?? e?.message ?? String(err)).slice(0, 160)}`;
+  return `${walletName} or the network stopped this step: ${(e?.shortMessage ?? e?.message ?? String(err)).slice(0, 280)}`;
 }

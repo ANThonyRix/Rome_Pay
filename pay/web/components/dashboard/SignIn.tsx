@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { stringToHex } from "viem";
 import { createSiweMessage } from "viem/siwe";
 import { CHAIN } from "@/lib/chain";
+import { isUserRejection } from "@/lib/payflow";
 import {
   connectEvm,
   connectSolana,
@@ -91,8 +92,7 @@ export default function SignIn() {
       await steps();
       router.refresh();
     } catch (err) {
-      const code = (err as { code?: number })?.code;
-      const rejected = code === 4001 || /reject|declin|cancel/i.test((err as Error)?.message ?? "");
+      const rejected = isUserRejection(err);
       setError(rejected ? "You closed the request in your wallet. Nothing was signed." : (err as Error).message);
       setPhase("idle");
       setLane(null);
