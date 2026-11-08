@@ -51,6 +51,10 @@ export function listEvmWallets(onChange: (wallets: EvmWallet[]) => void): () => 
 /** MetaMask first, then any other EVM wallet. */
 export const pickEvmWallet = (wallets: EvmWallet[]) => wallets.find((w) => w.rdns === "io.metamask") ?? wallets[0] ?? null;
 
+/** All EVM wallets, MetaMask first. The same address signs in to the same dashboard in any of them. */
+export const sortEvmWallets = (wallets: EvmWallet[]) =>
+  [...wallets].sort((a, b) => Number(b.rdns === "io.metamask") - Number(a.rdns === "io.metamask"));
+
 export async function connectEvm(wallet: EvmWallet): Promise<`0x${string}`> {
   const accounts = (await wallet.provider.request({ method: "eth_requestAccounts" })) as string[];
   const [account] = accounts ?? [];
@@ -84,6 +88,28 @@ export function listSolanaWallets(cluster: string, onChange: (wallets: SolanaWal
   return () => offs.forEach((off) => off());
 }
 
+const SIGNED_IN_WALLET = "rp_solana_wallet";
+
+/** Remember which Solana wallet opened the dashboard, so Withdraw asks the same one. */
+export function rememberSolanaWallet(name: string) {
+  try {
+    localStorage.setItem(SIGNED_IN_WALLET, name);
+  } catch {
+    // storage blocked: Withdraw falls back to the first wallet
+  }
+}
+
+/** The wallet the merchant signed in with, else the first one listed. */
+export function preferredSolanaWallet(wallets: SolanaWallet[]): SolanaWallet | null {
+  let name: string | null = null;
+  try {
+    name = localStorage.getItem(SIGNED_IN_WALLET);
+  } catch {
+    // storage blocked
+  }
+  return wallets.find((w) => w.name === name) ?? wallets[0] ?? null;
+}
+
 /** Phantom does not sign Solana v1 transactions on devnet; warn before the payer starts. */
 export const isKnownV1Gap = (wallet: SolanaWallet) => /phantom/i.test(wallet.name);
 
@@ -95,6 +121,20 @@ export async function connectSolana(wallet: SolanaWallet): Promise<SolanaAccount
   const [account] = accounts ?? [];
   if (!account) throw new Error(`${wallet.name} returned no account. Unlock it and try again.`);
   return account;
+}
+
+/** Signs a plain text message (dashboard sign-in). Fails if the wallet signed different bytes. */
+export async function signSolanaText(wallet: SolanaWallet, account: SolanaAccount, text: string): Promise<Uint8Array> {
+  const features = wallet.features as unknown as Features;
+  const message = new TextEncoder().encode(text);
+  const [{ signature, signedMessage }] = (await features["solana:signMessage"].signMessage({ account, message })) as {
+    signature: Uint8Array;
+    signedMessage?: Uint8Array;
+  }[];
+  if (signedMessage && (signedMessage.length !== message.length || signedMessage.some((b, i) => b !== message[i]))) {
+    throw new Error(`${wallet.name} changed the sign-in message before signing it.`);
+  }
+  return new Uint8Array(signature);
 }
 
 export function laneSigner(wallet: SolanaWallet, account: SolanaAccount, cluster: string): LaneSigner {

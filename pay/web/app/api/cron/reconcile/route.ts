@@ -1,4 +1,5 @@
 import { dbConfigured } from "@/lib/db";
+import { deliverDue } from "@/lib/notify";
 import { syncPaid } from "@/lib/store";
 
 // Daily safety net (vercel.json cron): stores any Paid event the checkout did not report.
@@ -11,7 +12,10 @@ export async function GET(request: Request) {
   if (!dbConfigured()) return Response.json({ error: "DATABASE_URL is not set" }, { status: 503 });
   // A day is about 360k blocks; 4 spans of 400k cover a missed day with room to spare.
   const result = await syncPaid({ maxSpans: 4 });
+  // Also retries notifications that failed earlier (their backoff is long past by the next day).
+  const notifications = await deliverDue(100);
   return Response.json({
+    notifications,
     head: result.head.toString(),
     cursor: result.cursor.toString(),
     stored: result.stored,

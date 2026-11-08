@@ -25,8 +25,9 @@ One-time steps are skipped when the wallet has already done them.
 
 ## Merchant dashboard and payment records
 
-- `/dashboard`: the merchant signs in with their wallet (Sign-In with Ethereum, a free message
-  signature). There they create links (fixed or open amount, single-use or reusable), copy or close
+- `/dashboard`: the merchant signs in with their wallet, a free message signature: any EVM wallet
+  such as MetaMask or Rabby (Sign-In with Ethereum), or any Solana wallet such as Solflare, Phantom or Backpack
+  (Sign-In with Solana). The dashboard belongs to the address, not the wallet app. There they create links (fixed or open amount, single-use or reusable), copy or close
   them, set a display name and see every payment with its fee. A fixed-amount link takes either one
   payment (an invoice) or many (a price tag). A link that never took a payment can be deleted; paid
   links are closed instead, so the history keeps saying what each payment was for.
@@ -34,6 +35,75 @@ One-time steps are skipped when the wallet has already done them.
   idempotent: the checkout reports its transaction hash to `/api/payments` (the server reads the
   receipt), pages pick up new `Paid` events with `eth_getLogs` when opened, and a daily Vercel cron
   (`/api/cron/reconcile`) catches anything left over.
+- Links cover invoices (fixed amount, one payment), price tags (fixed amount, many payments), and
+  tips, gifts or donations (open amount, the payer enters it).
+
+### Solflare merchants
+
+A merchant who signs in with Solflare is paid to the wallet's Rome address: the Rome synthetic of
+the Solflare key, `keccak256(pubkey)[12:]`, the same derivation as the Rome SDK. The dashboard shows
+that balance and a **Move to Solflare** button. It sets up the synthetic once (`create_pda`), creates
+the wallet's USDC account if missing, then moves the whole balance with the SDK's sweep leg
+(`HelperProgram.transfer_spl`). Solana network fees are paid in SOL.
+
+## Payment notifications
+
+Every payment stored for the first time is queued once per channel (an outbox table). Delivery runs
+right after the checkout reports a payment, after a dashboard visit that finds new payments, and in
+the daily cron. A failed delivery is retried at 1 min, 5 min, 30 min, 2 h and 12 h, at the next of
+those triggers; after 6 attempts it is marked as given up. The dashboard lists recent deliveries.
+
+### Telegram
+
+The merchant presses **Connect Telegram**, opens the bot and presses Start. The bot then sends a
+message for every payment: amount, what it was for, payer and a receipt link. `/stop` in the chat
+turns it off.
+
+Setup: create a bot with [@BotFather](https://t.me/BotFather), put its token in `TELEGRAM_BOT_TOKEN`
+and redeploy. The first Connect registers the bot's webhook at `/api/telegram` on the production
+domain; Telegram's requests are checked with a secret derived from the token.
+
+### Webhooks
+
+The merchant saves an HTTPS address. Each payment is sent as a `POST` with a JSON body:
+
+```json
+{
+  "id": "evt_<tx hash without 0x>_<n>",
+  "type": "payment.received",
+  "created": 1762560000,
+  "network": { "chainId": 200010, "name": "Rome Hadrian", "testnet": true },
+  "data": {
+    "link": { "id": "Ab3...", "memo": "Order 1042", "amount": "5000000" },
+    "merchant": "0x...", "payer": "0x...", "token": "wUSDC", "decimals": 6,
+    "amount": "5000000", "fee": "50000", "net": "4950000",
+    "txHash": "0x...", "blockNumber": "519700000", "paidAt": "2026-11-08T12:00:00.000Z",
+    "receiptUrl": "https://via-hadrian.testnet.romeprotocol.xyz/tx/0x..."
+  }
+}
+```
+
+Amounts and the block number are strings; amounts are in base units (6 decimals). `link` is `null` for a payment that did not come
+from one of the merchant's links. The **Send test event** button sends `"type": "test"`.
+
+Headers: `rome-pay-event-id` (same as `id`, use it to ignore repeats) and
+`rome-pay-signature: t=<unix seconds>,v1=<hex>`, where `v1` is HMAC-SHA256 of `"<t>.<raw body>"`
+with the merchant's signing secret (`whsec_...`, shown in the dashboard). Answer with any 2xx within
+8 seconds. Redirects are not followed, and addresses that resolve to private networks are refused.
+
+```js
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+// rawBody: the request body exactly as received, before JSON.parse.
+function verifyRomePay(rawBody, header, secret, toleranceSec = 300) {
+  const parts = Object.fromEntries(header.split(",").map((kv) => kv.split("=")));
+  const t = Number(parts.t);
+  if (!t || Math.abs(Date.now() / 1000 - t) > toleranceSec) return false;
+  const expected = createHmac("sha256", secret).update(`${t}.${rawBody}`).digest("hex");
+  const given = String(parts.v1 ?? "");
+  return given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+}
+```
 
 ## Fees
 
@@ -81,6 +151,8 @@ npm run db:migrate
 |---|---|---|
 | `DATABASE_URL` | Neon integration in Vercel | links, sessions, payments |
 | `CRON_SECRET` | set by hand in Vercel, any long random string | authorizes the daily reconcile cron |
+| `TELEGRAM_BOT_TOKEN` | optional, from @BotFather | Telegram payment messages |
+| `WEBHOOK_ALLOW_PRIVATE` | optional, `1` in local development only | lets webhooks reach `http://localhost` (ignored in production) |
 | `NEXT_PUBLIC_SOLANA_RPC` | optional | Solana Devnet RPC for the Solflare lane |
 
 To pay on testnet you need:
@@ -120,6 +192,4 @@ schedules the reconcile cron daily at 04:00 UTC (the Hobby plan allows one run p
 
 ## Roadmap
 
-- Signed webhooks (HMAC) for merchants
-- Dashboard sign-in with Solflare
 - Mainnet (Rome Rubicon) deployment

@@ -55,6 +55,36 @@ create table if not exists sync_state (
   updated_at  timestamptz not null default now()
 );
 
+-- Solana sign-in: a Solflare merchant's address is the Rome synthetic of this pubkey (base58).
+alter table merchants add column if not exists solana_pubkey text unique;
+
+-- Payment notifications. The webhook secret signs every delivery (HMAC-SHA256), so it is stored
+-- as is; the Telegram code is a one-time, short-lived token for the bot's /start deep link.
+alter table merchants add column if not exists webhook_url text;
+alter table merchants add column if not exists webhook_secret text;
+alter table merchants add column if not exists telegram_chat_id bigint;
+alter table merchants add column if not exists telegram_code text unique;
+alter table merchants add column if not exists telegram_code_expires timestamptz;
+
+-- Outbox: one row per payment and channel, queued when the payment is first stored.
+create table if not exists notifications (
+  id               bigserial primary key,
+  merchant         text not null references merchants(address) on delete cascade,
+  channel          text not null check (channel in ('webhook', 'telegram')),
+  tx_hash          text not null,
+  log_index        integer not null,
+  status           text not null default 'pending' check (status in ('pending', 'sent', 'failed')),
+  attempts         integer not null default 0,
+  next_attempt_at  timestamptz not null default now(),
+  response_status  integer,
+  last_error       text,
+  sent_at          timestamptz,
+  created_at       timestamptz not null default now(),
+  unique (channel, tx_hash, log_index)
+);
+create index if not exists notifications_due_idx on notifications (next_attempt_at) where status = 'pending';
+create index if not exists notifications_merchant_idx on notifications (merchant, created_at desc);
+
 -- One-off fix, 2026-11-08: rows stored before log_index meant "position in tx" used the RPC logIndex,
 -- which differs between receipts and eth_getLogs on Rome, so one event could be stored twice.
 -- Drop the copies, renumber, then set the marker so this never runs again.

@@ -5,6 +5,7 @@
 import {
   buildCreatePdaCall,
   buildFundLeg,
+  buildSweepLeg,
   isSyntheticProvisioned,
   submitRomeTx,
   submitRomeTxV1,
@@ -95,7 +96,7 @@ export function stepCall(step: StepId, plan: Plan, invoice: Invoice): { to: Hex;
   }
 }
 
-const readWusdc = (who: Hex) => publicClient.readContract({ address: CHAIN.wusdc, abi: erc20Abi, functionName: "balanceOf", args: [who] });
+export const readWusdc = (who: Hex) => publicClient.readContract({ address: CHAIN.wusdc, abi: erc20Abi, functionName: "balanceOf", args: [who] });
 const readAllowance = (who: Hex) =>
   publicClient.readContract({ address: CHAIN.wusdc, abi: erc20Abi, functionName: "allowance", args: [who, CHAIN.payRouter] });
 const readEnabled = (who: Hex) => publicClient.readContract({ address: CHAIN.wusdc, abi: WRAPPER_ABI, functionName: "isEnabled", args: [who] });
@@ -240,6 +241,47 @@ export async function runSolanaStep(signer: SignerLike, wallet: PublicKey, step:
     throw new StepFailed(step, result.receipt ? "the transaction reverted" : "no receipt arrived in time", result.hash);
   }
   return { hash: result.hash, signature: result.signature };
+}
+
+// ------------------------------ Solana merchant withdraw ------------------------------
+
+export type WithdrawStep = "provision" | "account" | "move";
+
+/**
+ * Moves a Solana merchant's whole wUSDC balance from its Rome synthetic to its Solflare wallet:
+ * create the synthetic's PDA once, create the wallet's USDC account if missing, then
+ * HelperProgram.transfer_spl (the SDK's sweep leg). Each step reports itself before it asks the wallet.
+ */
+export async function runWithdraw(
+  signer: SignerLike,
+  wallet: PublicKey,
+  onStep: (step: WithdrawStep) => void,
+): Promise<{ hash: Hex; amount: bigint }> {
+  const conn = connection();
+  const synthetic = syntheticAddress(wallet);
+  const amount = await readWusdc(synthetic);
+  if (amount === 0n) throw new Error("There is nothing to move yet.");
+  const deps = { connection: conn, proxyUrl: CHAIN.rpcUrl, chainId: CHAIN.chainId, programId: CHAIN.programId, signer };
+
+  if (!(await isSyntheticProvisioned(conn, CHAIN.programId, synthetic))) {
+    onStep("provision");
+    const created = await submitRomeTxV1(deps, buildCreatePdaCall(synthetic));
+    if (created.receipt?.status !== "0x1") throw new StepFailed("provision", "the account setup did not confirm", created.hash);
+  }
+
+  const leg = buildSweepLeg({ programId: CHAIN.programId, mint: new PublicKey(CHAIN.usdcMint), amount, wallet, synthetic });
+  const walletAta = leg.extraAccounts[0].pubkey;
+  if (!(await conn.getAccountInfo(walletAta))) {
+    onStep("account");
+    await submitSolanaInstructionsV1([leg.ensureWalletAtaIx], { connection: conn, signer });
+  }
+
+  onStep("move");
+  const moved = await submitRomeTxV1(deps, { to: leg.helperTo, data: leg.calldata });
+  if (moved.receipt?.status !== "0x1") {
+    throw new StepFailed("pay", moved.receipt ? "the transfer reverted" : "no receipt arrived in time", moved.hash);
+  }
+  return { hash: moved.hash, amount };
 }
 
 // ------------------------------ helpers ------------------------------

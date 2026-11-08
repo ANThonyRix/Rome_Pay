@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { isHash } from "viem";
 import { dbConfigured } from "@/lib/db";
+import { deliverDue } from "@/lib/notify";
 import { verifyPaymentTx } from "@/lib/store";
 
 // The checkout reports a pay transaction here. Nothing from the client is trusted:
@@ -13,6 +15,8 @@ export async function POST(request: Request) {
   }
   try {
     const result = await verifyPaymentTx(txHash);
+    // Webhooks and Telegram messages go out after the checkout has its answer.
+    if (result.status === "confirmed" && result.stored > 0) after(() => deliverDue());
     return Response.json(result, { status: result.status === "pending" ? 202 : 200 });
   } catch (error) {
     console.error("[rome-pay] verify failed", error);

@@ -1,19 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { connection } from "next/server";
+import { after, connection } from "next/server";
 import { Suspense } from "react";
 import CopyLink from "@/components/dashboard/CopyLink";
 import DeleteLink from "@/components/dashboard/DeleteLink";
 import NameForm from "@/components/dashboard/NameForm";
 import NewLinkForm from "@/components/dashboard/NewLinkForm";
+import Notifications from "@/components/dashboard/Notifications";
 import Reveal from "@/components/dashboard/Reveal";
 import SignIn from "@/components/dashboard/SignIn";
+import Withdraw from "@/components/dashboard/Withdraw";
 import d from "@/components/dashboard/dashboard.module.css";
 import SiteHeader from "@/components/SiteHeader";
 import { currentMerchant } from "@/lib/auth";
 import { addressUrl, txUrl } from "@/lib/chain";
 import { dbConfigured } from "@/lib/db";
 import { fmt, short } from "@/lib/format";
+import { deliverDue, listDeliveries, telegramConfigured, type Delivery } from "@/lib/notify";
+import { readWusdc } from "@/lib/payflow";
 import { listLinks, listPayments, syncQuietly, totals, type LinkSummary, type Payment } from "@/lib/store";
 import { setArchivedAction, signOutAction } from "./actions";
 
@@ -65,11 +69,14 @@ async function Dashboard() {
     );
   }
 
-  await syncQuietly();
-  const [links, payments, sums] = await Promise.all([
+  // New payments found by the sync are queued for notification; send them after the response.
+  if (await syncQuietly()) after(() => deliverDue());
+  const [links, payments, sums, deliveries, onRome] = await Promise.all([
     listLinks(merchant.address),
     listPayments(merchant.address),
     totals(merchant.address),
+    listDeliveries(merchant.address, 10),
+    merchant.solanaPubkey ? readWusdc(merchant.address).catch(() => null) : Promise.resolve(null),
   ]);
   const openLinks = links.filter((link) => link.status === "open").length;
 
@@ -77,7 +84,7 @@ async function Dashboard() {
     <>
       <SiteHeader current="dashboard">
         <a className={d.account} href={addressUrl(merchant.address)} target="_blank" rel="noreferrer" title={merchant.address}>
-          {short(merchant.address)}
+          {merchant.solanaPubkey ? short(merchant.solanaPubkey) : short(merchant.address)}
         </a>
         <form action={signOutAction}>
           <button className={d.textButton} type="submit">
@@ -111,6 +118,7 @@ async function Dashboard() {
               <dd>{openLinks}</dd>
             </div>
           </dl>
+          {merchant.solanaPubkey && onRome !== null ? <Withdraw pubkey={merchant.solanaPubkey} balance={onRome.toString()} /> : null}
         </div>
 
         <div className={d.grid}>
@@ -138,6 +146,19 @@ async function Dashboard() {
                   No payments yet. When someone pays one of your links, it appears here a few seconds after Rome confirms it.
                 </p>
               )}
+            </section>
+
+            <section aria-labelledby="notify-title">
+              <h2 id="notify-title" className={d.sectionTitle}>
+                Payment notifications
+              </h2>
+              <Notifications
+                webhookUrl={merchant.webhookUrl}
+                webhookSecret={merchant.webhookSecret}
+                telegramConnected={merchant.telegramConnected}
+                telegramAvailable={telegramConfigured()}
+              />
+              {deliveries.length ? <DeliveriesTable deliveries={deliveries} /> : null}
             </section>
           </div>
         </div>
@@ -236,5 +257,43 @@ function HistoryTable({ payments }: { payments: Payment[] }) {
         </tr>
       ))}
     />
+  );
+}
+
+const CHANNEL: Record<Delivery["channel"], string> = { webhook: "Webhook", telegram: "Telegram" };
+const DELIVERY: Record<Delivery["status"], string> = { pending: "Retrying", sent: "Delivered", failed: "Gave up" };
+
+function DeliveriesTable({ deliveries }: { deliveries: Delivery[] }) {
+  return (
+    <div className={d.deliveries}>
+      <h3 className={d.label}>Recent deliveries</h3>
+      <table className={d.table}>
+        <thead>
+          <tr>
+            <th scope="col">Date, UTC</th>
+            <th scope="col">Channel</th>
+            <th scope="col">For</th>
+            <th scope="col" className={d.num}>Amount</th>
+            <th scope="col">Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {deliveries.map((n) => (
+            <tr key={n.id} data-status={n.status === "failed" ? "archived" : undefined}>
+              <td data-label="Date">{when.format(n.createdAt)}</td>
+              <td data-label="Channel">{CHANNEL[n.channel]}</td>
+              <td data-label="For">{n.memo ?? <span className={d.muted}>Not from a link</span>}</td>
+              <td data-label="Amount" className={d.num}>{usdc(n.amount)}</td>
+              <td data-label="Result">
+                <span className={d.status} data-status={n.status === "sent" ? "paid" : "archived"}>
+                  {DELIVERY[n.status]}
+                </span>
+                {n.status !== "sent" && n.lastError ? <span className={d.deliveryError}>{n.lastError}</span> : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -63,6 +63,123 @@
   color: var(--text-muted);
 }
 
+/* ------------------------------ Solana merchant balance ------------------------------ */
+.withdraw {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+.withdrawText,
+.withdrawAction {
+  display: grid;
+  gap: var(--s2);
+  align-content: start;
+}
+.withdrawAmount {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1;
+}
+.withdrawAmount small {
+  font-size: 0.45em;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.withdrawAction .secondary {
+  justify-self: start;
+}
+.withdrawAction .secondary[aria-busy] {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+@media (min-width: 720px) {
+  .withdraw {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+  .withdrawAction {
+    justify-items: end;
+    text-align: right;
+  }
+  .withdrawAction .secondary {
+    justify-self: end;
+  }
+}
+
+/* ------------------------------ notifications ------------------------------ */
+.channels {
+  display: grid;
+  gap: var(--s4);
+}
+@media (min-width: 880px) {
+  .channels {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+    align-items: start;
+  }
+}
+.channel {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s5);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  min-width: 0;
+}
+.channelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.channelText {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--text-muted);
+}
+.channelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+.channel .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  text-decoration: none;
+}
+.channel .field > .textButton {
+  justify-self: start;
+  padding-left: 0;
+}
+.secret {
+  display: block;
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--enamel-deep);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.deliveries {
+  display: grid;
+  gap: var(--s3);
+  margin-top: var(--s6);
+}
+.deliveryError {
+  display: block;
+  margin-top: var(--s1);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
 /* ------------------------------ layout ------------------------------ */
 .grid {
   display: grid;
@@ -490,6 +607,27 @@ a.mono:hover {
   max-width: 720px;
   padding: clamp(48px, 12vh, 128px) 0 var(--s8);
 }
+.signInGroup {
+  display: grid;
+  gap: var(--s2);
+}
+.signInActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+.signInActions .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  text-decoration: none;
+}
+.signInActions .secondary[aria-busy] {
+  border-color: var(--amber);
+  color: var(--amber);
+}
 .signInTitle {
   font-family: var(--font-display);
   font-weight: 700;
@@ -500,7 +638,8 @@ a.mono:hover {
 }
 
 @media (max-width: 639px) {
-  .primary {
+  .primary,
+  .signInActions .secondary {
     width: 100%;
   }
 }

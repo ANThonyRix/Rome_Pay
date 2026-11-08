@@ -15,15 +15,33 @@ const lower = (address: string) => address.toLowerCase();
 export interface Merchant {
   address: Hex;
   name: string;
+  /** Set for merchants who sign in with a Solana wallet; `address` is then its Rome synthetic. */
+  solanaPubkey: string | null;
+  webhookUrl: string | null;
+  webhookSecret: string | null;
+  telegramConnected: boolean;
 }
 
-export async function upsertMerchant(address: Hex): Promise<void> {
-  await db()`insert into merchants (address) values (${lower(address)}) on conflict (address) do nothing`;
+export async function upsertMerchant(address: Hex, solanaPubkey: string | null = null): Promise<void> {
+  await db()`
+    insert into merchants (address, solana_pubkey) values (${lower(address)}, ${solanaPubkey})
+    on conflict (address) do update set solana_pubkey = coalesce(merchants.solana_pubkey, excluded.solana_pubkey)`;
 }
 
 export async function getMerchant(address: Hex): Promise<Merchant | null> {
-  const [row] = await db()`select address, name from merchants where address = ${lower(address)}`;
-  return row ? { address: getAddress(row.address as string), name: row.name as string } : null;
+  const [row] = await db()`
+    select address, name, solana_pubkey, webhook_url, webhook_secret, telegram_chat_id
+    from merchants where address = ${lower(address)}`;
+  return row
+    ? {
+        address: getAddress(row.address as string),
+        name: row.name as string,
+        solanaPubkey: (row.solana_pubkey as string) ?? null,
+        webhookUrl: (row.webhook_url as string) ?? null,
+        webhookSecret: (row.webhook_secret as string) ?? null,
+        telegramConnected: row.telegram_chat_id !== null,
+      }
+    : null;
 }
 
 export async function setMerchantName(address: Hex, name: string): Promise<void> {
@@ -194,6 +212,7 @@ type PaidLog = Log<bigint, number, false, typeof PAID_EVENT, true, [typeof PAID_
  * Stores Paid events (idempotent by tx hash + position of the event in the tx). A payment is linked to an invoice only
  * when the ref, the merchant and, for fixed amounts, the amount all match; a single-use invoice
  * is then marked paid. Unmatched events are still stored: they count towards protocol totals.
+ * A newly stored payment queues one notification per channel its merchant has turned on.
  */
 async function storePaidLogs(logs: PaidLog[]): Promise<number> {
   if (!logs.length) return 0;
@@ -236,7 +255,16 @@ async function storePaidLogs(logs: PaidLog[]): Promise<number> {
                 and (i.amount is null or i.amount = ${amount.toString()}::numeric)),
             ${lower(merchant)}, ${lower(payer)}, ${amount.toString()}, ${fee.toString()})
           on conflict do nothing
-          returning invoice_id, block_time
+          returning tx_hash, log_index, merchant, invoice_id, block_time
+        ),
+        queued as (
+          insert into notifications (merchant, channel, tx_hash, log_index)
+          select ins.merchant, c.channel, ins.tx_hash, ins.log_index
+          from ins
+          join merchants m on m.address = ins.merchant
+          cross join lateral (values ('webhook', m.webhook_url is not null), ('telegram', m.telegram_chat_id is not null)) c(channel, enabled)
+          where c.enabled
+          on conflict do nothing
         ),
         upd as (
           update invoices set status = 'paid', paid_at = coalesce(invoices.paid_at, ins.block_time, now())
@@ -311,11 +339,13 @@ export async function syncPaid({ maxSpans = 3, minIntervalMs = 0 } = {}): Promis
   return { head, cursor, stored, caughtUp: cursor >= head };
 }
 
-/** Best-effort sync for page renders: never throws, never blocks long. */
-export async function syncQuietly(): Promise<void> {
+/** Best-effort sync for page renders: never throws, never blocks long. Returns whether it stored anything new. */
+export async function syncQuietly(): Promise<boolean> {
   try {
-    await syncPaid({ maxSpans: 2, minIntervalMs: 20_000 });
+    const result = await syncPaid({ maxSpans: 2, minIntervalMs: 20_000 });
+    return result.stored > 0;
   } catch (error) {
     console.warn("[rome-pay] sync failed", error instanceof Error ? error.message : error);
+    return false;
   }
 }
