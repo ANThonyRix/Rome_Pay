@@ -23,6 +23,11 @@ Rome runs EVM transactions on Solana, so both wallets reach the same contract:
 
 One-time steps are skipped when the wallet has already done them.
 
+## FAQ
+
+`/faq` explains the service in plain words for payers and merchants (paying, getting paid, fees, safety).
+The text lives in `pay/web/app/faq/page.tsx`; keep it in step with the checkout and fee when they change.
+
 ## Merchant dashboard and payment records
 
 - `/dashboard`: the merchant signs in with their wallet, a free message signature: any EVM wallet
