@@ -18,3 +18,7 @@ verifies the signature over that message and broadcasts it. `ParsedV1Message` al
 `loadedAccountsBytes`. Signers without the method behave as upstream.
 
 Replace with the npm package once `@rome-protocol/sdk` is published to the registry.
+
+Local change (2026-11-08, `solana.ts`): imports `Buffer` from `buffer` (v6) instead of using
+the global. In the browser the global can be Next's bundled polyfill, which has no
+`writeBigUInt64LE`; the fund leg failed with "writeBigUInt64LE is not a function".

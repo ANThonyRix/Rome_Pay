@@ -19,6 +19,9 @@
  *  - **Treasure wallet** — execution pays a per-chain treasure PDA ~5000
  *    lamports; account discovery (`eth_estimateGas`) omits it, so it's appended.
  */
+// Local change (see VENDORED.md): the browser global Buffer can be Next's bundled
+// polyfill, which lacks writeBigUInt64LE; import buffer@6 explicitly.
+import { Buffer } from "buffer";
 import {
   Connection,
   ComputeBudgetProgram,
