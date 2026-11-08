@@ -6,7 +6,7 @@
 import { getWallets } from "@wallet-standard/app";
 import { PublicKey } from "@solana/web3.js";
 import { ed25519 } from "@noble/curves/ed25519";
-import { parseV1Message, splitV1Wire, type LaneSigner, type ParsedV1Message } from "@/vendor/rome-sdk";
+import { parseV1Message, splitV1Wire, walletAddedPriorityFee, type LaneSigner, type ParsedV1Message } from "@/vendor/rome-sdk";
 import type { Eip1193 } from "./payflow";
 
 // ------------------------------ EVM (EIP-6963) ------------------------------
@@ -140,6 +140,13 @@ export async function signSolanaText(wallet: SolanaWallet, account: SolanaAccoun
 export function laneSigner(wallet: SolanaWallet, account: SolanaAccount, cluster: string): LaneSigner {
   const features = wallet.features as unknown as Features;
   const chain = solanaChainId(cluster);
+  const signWire = async (wire: Uint8Array) => {
+    const [{ signedTransaction }] = (await features["solana:signTransaction"].signTransaction({ account, transaction: wire, chain })) as {
+      signedTransaction: Uint8Array;
+    }[];
+    return new Uint8Array(signedTransaction);
+  };
+  const payer = account.publicKey as Uint8Array;
   return {
     payer: new PublicKey(account.publicKey),
     signAuthHash: async (message: Uint8Array) => {
@@ -153,13 +160,33 @@ export function laneSigner(wallet: SolanaWallet, account: SolanaAccount, cluster
       }
       return signature;
     },
-    signV1Wire: async (wire: Uint8Array) => {
-      const [{ signedTransaction }] = (await features["solana:signTransaction"].signTransaction({ account, transaction: wire, chain })) as {
-        signedTransaction: Uint8Array;
-      }[];
-      return pickV1Signature(wallet.name, wire, new Uint8Array(signedTransaction), account.publicKey as Uint8Array);
-    },
+    signV1Wire: async (wire: Uint8Array) => pickV1Signature(wallet.name, wire, await signWire(wire), payer),
+    // Used by the SDK instead of signV1Wire: Solflare adds its own priority fee to the v1
+    // message before signing, so the SDK needs the message that was actually signed.
+    signV1WireWithMessage: async (wire: Uint8Array) => readSignedV1(wallet.name, wire, await signWire(wire), payer),
   };
+}
+
+/**
+ * The message the wallet signed and its signature. Either our composed message, or the
+ * wallet's copy with only a priority fee added (the SDK checks that again and caps the fee).
+ */
+function readSignedV1(walletName: string, wire: Uint8Array, signed: Uint8Array, payer: Uint8Array) {
+  const { message } = splitV1Wire(wire);
+  try {
+    return { message, signature: pickV1Signature(walletName, wire, signed, payer) };
+  } catch (err) {
+    // Two layouts: signature last (v1 wire), or a one-byte count and the signature first.
+    const layouts: [Uint8Array, Uint8Array][] = [];
+    if (signed[0] === V1_VERSION && signed.length > SIG) layouts.push([signed.slice(0, -SIG), signed.slice(-SIG)]);
+    if (signed[0] === 1 && signed[1 + SIG] === V1_VERSION) layouts.push([signed.slice(1 + SIG), signed.slice(1, 1 + SIG)]);
+    for (const [walletMessage, signature] of layouts) {
+      if (walletAddedPriorityFee(message, walletMessage) !== null && ed25519.verify(signature, walletMessage, payer)) {
+        return { message: walletMessage, signature };
+      }
+    }
+    throw err;
+  }
 }
 
 const SIG = 64;

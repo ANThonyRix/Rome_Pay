@@ -64,6 +64,13 @@ export interface LaneSigner {
    * `signedTransaction`, so return `signedTransaction.slice(-64)`.
    */
   signV1Wire(unsignedWire: Uint8Array): Promise<Uint8Array>;
+  /**
+   * Optional (local change, see VENDORED.md): sign and return the message the wallet
+   * actually signed with its signature. When present it is used instead of `signV1Wire`,
+   * so a wallet that adds its own priority fee (Solflare does) can land; the only change
+   * accepted is that fee, capped by MAX_WALLET_PRIORITY_FEE_LAMPORTS.
+   */
+  signV1WireWithMessage?(unsignedWire: Uint8Array): Promise<{ message: Uint8Array; signature: Uint8Array }>;
 }
 
 export type SignerLike = LaneSigner | Keypair;
@@ -110,6 +117,41 @@ export function packSignedV1Wire(message: Uint8Array, signature: Uint8Array): Ui
   out.set(message, 0);
   out.set(signature, message.length);
   return out;
+}
+
+/** The most a wallet may add as its own priority fee before the lane refuses its transaction: 0.001 SOL. */
+export const MAX_WALLET_PRIORITY_FEE_LAMPORTS = 1_000_000n;
+const MAX_COMPUTE_UNITS = 1_400_000n;
+
+/**
+ * The priority fee (micro-lamports per compute unit) a wallet added, when `signed` is
+ * `composed` byte for byte except for that fee: both fee bits newly set in the config
+ * mask and the u64 inserted right after the account keys. Any other difference: null.
+ */
+export function walletAddedPriorityFee(composed: Uint8Array, signed: Uint8Array): bigint | null {
+  if (composed.length < MIN_MESSAGE_BYTES || signed.length !== composed.length + 8) return null;
+  const before = new DataView(composed.buffer, composed.byteOffset, composed.byteLength);
+  const after = new DataView(signed.buffer, signed.byteOffset, signed.byteLength);
+  const mask = before.getUint32(4, true);
+  if ((mask & 0b11) !== 0 || after.getUint32(4, true) !== (mask | 0b11)) return null;
+  const at = MIN_MESSAGE_BYTES + 32 * composed[41]!;
+  if (at > composed.length) return null;
+  for (let i = 0; i < at; i++) if ((i < 4 || i >= 8) && signed[i] !== composed[i]) return null;
+  for (let i = at; i < composed.length; i++) if (signed[i + 8] !== composed[i]) return null;
+  return after.getBigUint64(at, true);
+}
+
+/** The message to broadcast: the composed one, or the wallet's copy when it only added a capped priority fee. */
+function acceptWalletMessage(composed: Uint8Array, signed: Uint8Array): Uint8Array {
+  if (signed.length === composed.length && signed.every((b, i) => b === composed[i])) return composed;
+  const fee = walletAddedPriorityFee(composed, signed);
+  if (fee === null) throw new Error("the wallet changed the transaction beyond adding a priority fee");
+  const units = BigInt(parseV1Message(signed).computeUnitLimit ?? MAX_COMPUTE_UNITS);
+  const lamports = (fee * units + 999_999n) / 1_000_000n;
+  if (lamports > MAX_WALLET_PRIORITY_FEE_LAMPORTS) {
+    throw new Error(`the wallet added a priority fee of ${lamports} lamports, above the ${MAX_WALLET_PRIORITY_FEE_LAMPORTS} this lane accepts`);
+  }
+  return signed;
 }
 
 export interface V1Instruction {
@@ -537,12 +579,23 @@ function checkAuthorization(data: Uint8Array, payer: PublicKey, hash: Uint8Array
 async function signAndSend(deps: SolanaLaneV1Deps, signer: LaneSigner, wire: Uint8Array, expected: Expected): Promise<string> {
   const { message } = splitV1Wire(wire);
   checkComposed(parseV1Message(message), signer.payer, new PublicKey(deps.programId), expected);
-  const txSig = await signChecked(signer, wire, message);
-  return broadcastAndConfirm(deps.connection, packSignedV1Wire(message, txSig), txSig, deps.confirmTimeoutMs, deps.fetchImpl ?? fetch);
+  const signed = await signChecked(signer, wire, message);
+  return broadcastAndConfirm(deps.connection, packSignedV1Wire(signed.message, signed.txSig), signed.txSig, deps.confirmTimeoutMs, deps.fetchImpl ?? fetch);
 }
 
-/** Ask the wallet to sign a v1 wire and check the answer is a 64-byte signature over `message` by the payer. */
-async function signChecked(signer: LaneSigner, wire: Uint8Array, message: Uint8Array): Promise<Uint8Array> {
+/**
+ * Ask the wallet to sign a v1 wire and check the answer is a 64-byte signature by the payer
+ * over `message`, or over the wallet's copy when it only added a capped priority fee.
+ */
+async function signChecked(signer: LaneSigner, wire: Uint8Array, message: Uint8Array): Promise<{ message: Uint8Array; txSig: Uint8Array }> {
+  if (signer.signV1WireWithMessage) {
+    const out = await signer.signV1WireWithMessage(wire);
+    const signedMessage = acceptWalletMessage(message, out.message);
+    if (!(out.signature instanceof Uint8Array) || out.signature.length !== SIGNATURE_BYTES || !ed25519.verify(out.signature, signedMessage, signer.payer.toBytes())) {
+      throw new Error("the wallet signed a different transaction than the one composed");
+    }
+    return { message: signedMessage, txSig: out.signature };
+  }
   const txSig = await signer.signV1Wire(wire);
   if (!(txSig instanceof Uint8Array) || txSig.length !== SIGNATURE_BYTES) {
     throw new Error(
@@ -553,7 +606,7 @@ async function signChecked(signer: LaneSigner, wire: Uint8Array, message: Uint8A
   if (!ed25519.verify(txSig, message, signer.payer.toBytes())) {
     throw new Error("the wallet signed a different transaction than the one composed");
   }
-  return txSig;
+  return { message, txSig };
 }
 
 /** Send a signed v1 wire without preflight and poll until it is confirmed; throws with the signature on failure or timeout. */
@@ -616,8 +669,8 @@ export async function submitSolanaInstructionsV1(
     recentBlockhash: blockhash,
     ...(deps.computeUnitLimit === undefined ? {} : { computeUnitLimit: deps.computeUnitLimit }),
   });
-  const txSig = await signChecked(signer, packSignedV1Wire(message, new Uint8Array(SIGNATURE_BYTES)), message);
-  const signature = await broadcastAndConfirm(deps.connection, packSignedV1Wire(message, txSig), txSig, deps.confirmTimeoutMs, deps.fetchImpl ?? fetch);
+  const signed = await signChecked(signer, packSignedV1Wire(message, new Uint8Array(SIGNATURE_BYTES)), message);
+  const signature = await broadcastAndConfirm(deps.connection, packSignedV1Wire(signed.message, signed.txSig), signed.txSig, deps.confirmTimeoutMs, deps.fetchImpl ?? fetch);
   return { signature };
 }
 
