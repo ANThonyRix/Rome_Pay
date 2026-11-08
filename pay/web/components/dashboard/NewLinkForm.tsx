@@ -8,6 +8,7 @@ import d from "./dashboard.module.css";
 export default function NewLinkForm() {
   const [state, action, pending] = useActionState<FormState, FormData>(createLinkAction, {});
   const [mode, setMode] = useState<"fixed" | "open">("fixed");
+  const [uses, setUses] = useState<"one" | "many">("one");
 
   return (
     <form className={d.form} action={action} aria-labelledby="new-link-title">
@@ -42,10 +43,24 @@ export default function NewLinkForm() {
       </label>
 
       {mode === "fixed" ? (
-        <label className={d.check}>
-          <input type="checkbox" name="reusable" />
-          <span>Accept more than one payment (a price tag, not an invoice)</span>
-        </label>
+        <>
+          <fieldset className={d.modes}>
+            <legend className={d.label}>Payments</legend>
+            <label className={d.mode}>
+              <input type="radio" name="uses" value="one" checked={uses === "one"} onChange={() => setUses("one")} />
+              <span>One payment</span>
+            </label>
+            <label className={d.mode}>
+              <input type="radio" name="uses" value="many" checked={uses === "many"} onChange={() => setUses("many")} />
+              <span>Many payments</span>
+            </label>
+          </fieldset>
+          <p className={d.note}>
+            {uses === "one"
+              ? "An invoice: the link closes once it is paid."
+              : "A price tag: anyone can pay this amount, as many times as they like, until you close the link."}
+          </p>
+        </>
       ) : null}
 
       <button className={d.primary} type="submit" disabled={pending} aria-busy={pending || undefined}>

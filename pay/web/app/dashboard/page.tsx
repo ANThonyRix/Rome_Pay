@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import CopyLink from "@/components/dashboard/CopyLink";
+import DeleteLink from "@/components/dashboard/DeleteLink";
 import NameForm from "@/components/dashboard/NameForm";
 import NewLinkForm from "@/components/dashboard/NewLinkForm";
 import Reveal from "@/components/dashboard/Reveal";
@@ -191,6 +192,7 @@ function LinksTable({ links }: { links: LinkSummary[] }) {
                 {link.status === "archived" ? "Reopen" : "Close"}
               </button>
             </form>
+            {link.paidCount === 0 ? <DeleteLink id={link.id} /> : null}
           </td>
         </tr>
       ))}

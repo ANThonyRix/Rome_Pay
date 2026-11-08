@@ -31,7 +31,7 @@ create index if not exists invoices_merchant_idx on invoices (merchant, created_
 -- Every Paid event of the router, matched to an invoice by ref when one exists.
 create table if not exists payments (
   tx_hash       text not null,
-  log_index     integer not null,
+  log_index     integer not null,          -- position among the router's Paid events in the tx (0, 1, ...), not the RPC logIndex
   block_number  bigint not null,
   block_time    timestamptz,
   ref           text not null,
@@ -48,8 +48,27 @@ create index if not exists payments_ref_idx on payments (ref);
 create index if not exists payments_block_idx on payments (block_number desc);
 
 -- Log scan cursor per router: the last block whose Paid events are stored.
+-- Also holds one-off migration markers (key 'migration:...').
 create table if not exists sync_state (
   key         text primary key,
   block       bigint not null,
   updated_at  timestamptz not null default now()
 );
+
+-- One-off fix, 2026-11-08: rows stored before log_index meant "position in tx" used the RPC logIndex,
+-- which differs between receipts and eth_getLogs on Rome, so one event could be stored twice.
+-- Drop the copies, renumber, then set the marker so this never runs again.
+delete from payments a using payments b
+where a.tx_hash = b.tx_hash and a.log_index > b.log_index
+  and a.ref = b.ref and a.merchant = b.merchant and a.payer = b.payer and a.amount = b.amount and a.fee = b.fee
+  and not exists (select 1 from sync_state where key = 'migration:payments-ordinal');
+
+update payments p set log_index = r.ordinal
+from (
+  select tx_hash, log_index, (row_number() over (partition by tx_hash order by log_index) - 1)::int as ordinal
+  from payments
+) r
+where p.tx_hash = r.tx_hash and p.log_index = r.log_index and p.log_index <> r.ordinal
+  and not exists (select 1 from sync_state where key = 'migration:payments-ordinal');
+
+insert into sync_state (key, block) values ('migration:payments-ordinal', 0) on conflict (key) do nothing;

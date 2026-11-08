@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { currentMerchant, signOut } from "@/lib/auth";
 import { parseUsdc } from "@/lib/invoices";
-import { createLink, setLinkArchived, setMerchantName } from "@/lib/store";
+import { createLink, deleteUnpaidLink, setLinkArchived, setMerchantName } from "@/lib/store";
 
 export type FormState = { error?: string; ok?: string; linkId?: string };
 
@@ -25,7 +25,7 @@ export async function createLinkAction(_prev: FormState, form: FormData): Promis
     if (amount === null) return { error: "Enter an amount above 0 and up to 1,000,000 USDC, with at most 6 decimals." };
   }
   // Open-amount links are for tips and donations, so they always accept repeat payments.
-  const reusable = open || form.get("reusable") === "on";
+  const reusable = open || form.get("uses") === "many";
 
   const linkId = await createLink(merchant.address, { amount, memo, reusable });
   revalidatePath("/dashboard");
@@ -48,6 +48,13 @@ export async function setArchivedAction(form: FormData): Promise<void> {
   if (!merchant) return;
   const id = String(form.get("id") ?? "");
   await setLinkArchived(merchant.address, id, form.get("archived") === "1");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteLinkAction(form: FormData): Promise<void> {
+  const merchant = await currentMerchant();
+  if (!merchant) return;
+  await deleteUnpaidLink(merchant.address, String(form.get("id") ?? ""));
   revalidatePath("/dashboard");
 }
 

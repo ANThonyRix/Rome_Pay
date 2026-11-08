@@ -109,6 +109,17 @@ export async function setLinkArchived(merchant: Hex, id: string, archived: boole
     where id = ${id} and merchant = ${lower(merchant)}`;
 }
 
+/**
+ * Deletes a link that never took a payment. Links with payments are only closed, so the
+ * history keeps saying what each payment was for.
+ */
+export async function deleteUnpaidLink(merchant: Hex, id: string): Promise<void> {
+  await db()`
+    delete from invoices i
+    where i.id = ${id} and i.merchant = ${lower(merchant)}
+      and not exists (select 1 from payments p where p.invoice_id = i.id)`;
+}
+
 // ------------------------------------------------------------------- payments
 
 export interface Payment {
@@ -180,7 +191,7 @@ export async function totals(merchant?: Hex): Promise<Totals> {
 type PaidLog = Log<bigint, number, false, typeof PAID_EVENT, true, [typeof PAID_EVENT], "Paid">;
 
 /**
- * Stores Paid events (idempotent by tx hash + log index). A payment is linked to an invoice only
+ * Stores Paid events (idempotent by tx hash + position of the event in the tx). A payment is linked to an invoice only
  * when the ref, the merchant and, for fixed amounts, the amount all match; a single-use invoice
  * is then marked paid. Unmatched events are still stored: they count towards protocol totals.
  */
@@ -195,15 +206,30 @@ async function storePaidLogs(logs: PaidLog[]): Promise<number> {
     }),
   );
 
+  // Rome's RPC reports different logIndex values for the same log in receipts and in eth_getLogs,
+  // so the stored key is the event's position among the router's Paid events in its transaction.
+  // Both callers pass every Paid log of a transaction together, which keeps the position stable.
+  const ordered = [...logs].sort((a, b) =>
+    a.blockNumber === b.blockNumber ? a.logIndex - b.logIndex : a.blockNumber < b.blockNumber ? -1 : 1,
+  );
+  const seen = new Map<string, number>();
+  const ordinals = new Map<PaidLog, number>();
+  for (const log of ordered) {
+    const tx = lower(log.transactionHash);
+    const ordinal = seen.get(tx) ?? 0;
+    ordinals.set(log, ordinal);
+    seen.set(tx, ordinal + 1);
+  }
+
   const sql = db();
   const results = await sql.transaction(
-    logs.map((log) => {
+    ordered.map((log) => {
       const { ref, merchant, payer, amount, fee } = log.args;
       return sql`
         with ins as (
           insert into payments (tx_hash, log_index, block_number, block_time, ref, invoice_id, merchant, payer, amount, fee)
           values (
-            ${lower(log.transactionHash)}, ${log.logIndex}, ${log.blockNumber.toString()},
+            ${lower(log.transactionHash)}, ${ordinals.get(log)}, ${log.blockNumber.toString()},
             to_timestamp(${times.get(log.blockNumber) ?? null}::double precision), ${lower(ref)},
             (select id from invoices i
               where i.ref = ${lower(ref)} and i.merchant = ${lower(merchant)}

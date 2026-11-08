@@ -193,20 +193,13 @@
   outline: 2px solid var(--amber);
   outline-offset: 3px;
 }
-.check {
-  display: flex;
-  gap: var(--s3);
-  align-items: flex-start;
-  min-height: 44px;
-  padding-top: var(--s2);
-  color: var(--text-muted);
-  cursor: pointer;
+.confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
 }
-.check input {
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  flex: none;
+.danger {
+  color: var(--scarlet-text);
+  text-decoration-color: currentColor;
 }
 .note {
   margin: 0;
