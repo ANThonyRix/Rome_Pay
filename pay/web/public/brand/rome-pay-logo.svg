@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Rome Pay roundel on enamel; same mark as the site header (components/SiteHeader.tsx) -->
+  <rect width="1024" height="1024" fill="#0f1d3a"/>
+  <g transform="translate(212 212) scale(18.75)" fill="#f5f6f2">
+    <circle cx="16" cy="16" r="11" fill="none" stroke="#f5f6f2" stroke-width="4"/>
+    <rect x="2" y="13.5" width="28" height="5"/>
+  </g>
+</svg>
