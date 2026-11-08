@@ -67,8 +67,9 @@ export interface LaneSigner {
   /**
    * Optional (local change, see VENDORED.md): sign and return the message the wallet
    * actually signed with its signature. When present it is used instead of `signV1Wire`,
-   * so a wallet that adds its own priority fee (Solflare does) can land; the only change
-   * accepted is that fee, capped by MAX_WALLET_PRIORITY_FEE_LAMPORTS.
+   * so a wallet that re-serializes the message (Solflare adds a priority fee and reorders
+   * read-only keys) can land. Only an equivalent message is accepted (`compareWalletMessage`),
+   * its priority fee capped by MAX_WALLET_PRIORITY_FEE_LAMPORTS.
    */
   signV1WireWithMessage?(unsignedWire: Uint8Array): Promise<{ message: Uint8Array; signature: Uint8Array }>;
 }
@@ -123,31 +124,80 @@ export function packSignedV1Wire(message: Uint8Array, signature: Uint8Array): Ui
 export const MAX_WALLET_PRIORITY_FEE_LAMPORTS = 1_000_000n;
 const MAX_COMPUTE_UNITS = 1_400_000n;
 
+export type WalletMessageCheck = { ok: true; priorityFee: bigint } | { ok: false; reason: string };
+
 /**
- * The priority fee (micro-lamports per compute unit) a wallet added, when `signed` is
- * `composed` byte for byte except for that fee: both fee bits newly set in the config
- * mask and the u64 inserted right after the account keys. Any other difference: null.
+ * Whether `signed` is the same transaction as `composed`, as a wallet may re-serialize it.
+ * Seen live with Solflare: it adds its own priority fee and reorders the read-only account
+ * keys (remapping the instruction indices). Same means: same blockhash, header, compute
+ * limit, loaded-accounts size and heap; the same account keys, each in the same role
+ * (signer, writable) and the signers in the same order; the same instructions (program,
+ * account keys in order, data). The only value a wallet may add is a priority fee, and only
+ * when the composed message had none; the caller caps it.
  */
-export function walletAddedPriorityFee(composed: Uint8Array, signed: Uint8Array): bigint | null {
-  if (composed.length < MIN_MESSAGE_BYTES || signed.length !== composed.length + 8) return null;
-  const before = new DataView(composed.buffer, composed.byteOffset, composed.byteLength);
-  const after = new DataView(signed.buffer, signed.byteOffset, signed.byteLength);
-  const mask = before.getUint32(4, true);
-  if ((mask & 0b11) !== 0 || after.getUint32(4, true) !== (mask | 0b11)) return null;
-  const at = MIN_MESSAGE_BYTES + 32 * composed[41]!;
-  if (at > composed.length) return null;
-  for (let i = 0; i < at; i++) if ((i < 4 || i >= 8) && signed[i] !== composed[i]) return null;
-  for (let i = at; i < composed.length; i++) if (signed[i + 8] !== composed[i]) return null;
-  return after.getBigUint64(at, true);
+export function compareWalletMessage(composed: Uint8Array, signed: Uint8Array): WalletMessageCheck {
+  const fail = (reason: string): WalletMessageCheck => ({ ok: false, reason });
+  let a: ParsedV1Message;
+  let b: ParsedV1Message;
+  try {
+    a = parseV1Message(composed);
+    b = parseV1Message(signed);
+  } catch (err) {
+    return fail((err as Error).message);
+  }
+  for (let i = 8; i < 40; i++) if (composed[i] !== signed[i]) return fail("recent blockhash replaced");
+  const head = (p: ParsedV1Message) =>
+    `${p.header.numRequiredSignatures}/${p.header.numReadonlySignedAccounts}/${p.header.numReadonlyUnsignedAccounts}`;
+  if (head(a) !== head(b)) return fail(`header ${head(a)} -> ${head(b)}`);
+  if (a.computeUnitLimit !== b.computeUnitLimit) return fail(`compute limit ${a.computeUnitLimit} -> ${b.computeUnitLimit}`);
+  if (a.loadedAccountsBytes !== b.loadedAccountsBytes) {
+    return fail(`loaded-accounts size ${a.loadedAccountsBytes} -> ${b.loadedAccountsBytes}`);
+  }
+  if (a.heapBytes !== b.heapBytes) return fail(`heap ${a.heapBytes} -> ${b.heapBytes}`);
+  if (a.priorityFeeMicroLamports !== undefined && a.priorityFeeMicroLamports !== b.priorityFeeMicroLamports) {
+    return fail(`priority fee ${a.priorityFeeMicroLamports} -> ${b.priorityFeeMicroLamports ?? "none"}`);
+  }
+
+  const n = a.accountKeys.length;
+  if (b.accountKeys.length !== n) return fail(`accounts ${n} -> ${b.accountKeys.length}`);
+  const role = (p: ParsedV1Message, i: number) => {
+    const { numRequiredSignatures: s, numReadonlySignedAccounts: rs, numReadonlyUnsignedAccounts: ru } = p.header;
+    const signer = i < s;
+    return `${signer ? "signer" : "account"}${(signer ? i < s - rs : i < n - ru) ? "+writable" : ""}`;
+  };
+  const roles = new Map(a.accountKeys.map((k, i) => [k.toBase58(), role(a, i)] as const));
+  if (roles.size !== n) return fail("duplicate account keys in the composed message");
+  const seen = new Set<string>();
+  for (const [i, k] of b.accountKeys.entries()) {
+    const key = k.toBase58();
+    if (seen.has(key)) return fail(`account ${key} listed twice`);
+    seen.add(key);
+    const was = roles.get(key);
+    if (was === undefined) return fail(`account ${key} added`);
+    if (was !== role(b, i)) return fail(`account ${key} role ${was} -> ${role(b, i)}`);
+    if (i < a.header.numRequiredSignatures && !k.equals(a.accountKeys[i]!)) return fail("signers reordered");
+  }
+
+  if (a.instructions.length !== b.instructions.length) return fail(`instructions ${a.instructions.length} -> ${b.instructions.length}`);
+  const keyAt = (p: ParsedV1Message, i: number) => p.accountKeys[i]?.toBase58() ?? `#${i}`;
+  for (const [i, x] of a.instructions.entries()) {
+    const y = b.instructions[i]!;
+    if (keyAt(a, x.programIdIndex) !== keyAt(b, y.programIdIndex)) return fail(`instruction ${i} program changed`);
+    const xs = x.accountIndices.map((j) => keyAt(a, j)).join();
+    const ys = y.accountIndices.map((j) => keyAt(b, j)).join();
+    if (xs !== ys) return fail(`instruction ${i} accounts changed`);
+    if (x.data.length !== y.data.length || x.data.some((v, j) => v !== y.data[j])) return fail(`instruction ${i} data changed`);
+  }
+  return { ok: true, priorityFee: b.priorityFeeMicroLamports ?? 0n };
 }
 
-/** The message to broadcast: the composed one, or the wallet's copy when it only added a capped priority fee. */
+/** The message to broadcast: the composed one, or the wallet's equivalent copy with at most a capped priority fee. */
 function acceptWalletMessage(composed: Uint8Array, signed: Uint8Array): Uint8Array {
   if (signed.length === composed.length && signed.every((b, i) => b === composed[i])) return composed;
-  const fee = walletAddedPriorityFee(composed, signed);
-  if (fee === null) throw new Error("the wallet changed the transaction beyond adding a priority fee");
+  const check = compareWalletMessage(composed, signed);
+  if (!check.ok) throw new Error(`the wallet changed the transaction before signing it: ${check.reason}`);
   const units = BigInt(parseV1Message(signed).computeUnitLimit ?? MAX_COMPUTE_UNITS);
-  const lamports = (fee * units + 999_999n) / 1_000_000n;
+  const lamports = (check.priorityFee * units + 999_999n) / 1_000_000n;
   if (lamports > MAX_WALLET_PRIORITY_FEE_LAMPORTS) {
     throw new Error(`the wallet added a priority fee of ${lamports} lamports, above the ${MAX_WALLET_PRIORITY_FEE_LAMPORTS} this lane accepts`);
   }
@@ -167,6 +217,8 @@ export interface ParsedV1Message {
   priorityFeeMicroLamports?: bigint;
   /** Set only when the message's config mask carries a compute-unit limit. */
   computeUnitLimit?: number;
+  /** Set only when the message's config mask carries a loaded-accounts data size limit. */
+  loadedAccountsBytes?: number;
   /** Set only when the message's config mask carries a heap size. */
   heapBytes?: number;
 }
@@ -225,7 +277,7 @@ export function parseV1Message(message: Uint8Array): ParsedV1Message {
     off += 8;
   }
   const computeUnitLimit = mask & 0b100 ? u32("the compute-unit limit") : undefined;
-  if (mask & 0b1000) u32("the loaded-accounts size");
+  const loadedAccountsBytes = mask & 0b1000 ? u32("the loaded-accounts size") : undefined;
   const heapBytes = mask & 0b10000 ? u32("the heap size") : undefined;
 
   const heads: { programIdIndex: number; numAccounts: number; dataLen: number }[] = [];
@@ -251,6 +303,7 @@ export function parseV1Message(message: Uint8Array): ParsedV1Message {
     instructions,
     ...(priorityFeeMicroLamports === undefined ? {} : { priorityFeeMicroLamports }),
     ...(computeUnitLimit === undefined ? {} : { computeUnitLimit }),
+    ...(loadedAccountsBytes === undefined ? {} : { loadedAccountsBytes }),
     ...(heapBytes === undefined ? {} : { heapBytes }),
   };
 }
